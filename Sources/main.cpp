@@ -9,6 +9,7 @@
 // #include <errno.h> // Error
 
 #include "conductor.h"
+#include <string>
 
 int main(int argc, char*argv[])
 {
@@ -74,7 +75,8 @@ int main(int argc, char*argv[])
     //     << strerror(errno) << std::endl;
     // }
 
-    Conductor my_object("/dev/ttyS0");
+    std::string file_name = "/dev/ttyS0";
+    Conductor *my_object = new Conductor(file_name);
 
 
     // // Set serial port params back to the original
@@ -82,6 +84,6 @@ int main(int argc, char*argv[])
     //     std::cerr << "Error " << errno << " from tcsetattr: "
     //     << strerror(errno) << std::endl;
     // }
-
-    close(serial_port);
+    //
+    // close(serial_port);
 }
