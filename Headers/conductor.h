@@ -32,6 +32,49 @@ private:
     const long control_loop_period_ms = 1000; // ms
     void timer_handler(const boost::system::error_code& error);
 
+
+
+
+    // Channels
+    const double MAX_CHANNEL_VALUE = 100;
+    const double MIN_CHANNEL_VALUE = -100;
+    const unsigned char MSP_CHANNEL_ID = 200;
+    static int channelToTxRange(double value); //
+
+    // Mode
+    const int MODE_PC = 1;
+    const int MODE_JV = 2;
+    const int MODE_ERR = 0;
+    bool controllerActive = false;
+    void setControllerActive(const bool ctrlActv);
+
+    // Comms
+    const int PING_TIMEOUT = 100;
+    const int SEND_CONTROL_PERIOD_MS = 50; // ms, time between sending control commansd
+    int pingLoopTime = 0;
+    bool sendChannels(const std::array<double, 16> &channels, const bool response=false); //
+    bool sendEspMode(const int mode, const bool response=true); //
+    void parsePacket(QByteArray &data); //
+    void parseMode(QJsonObject mode_obj); //
+    void parsePing(QJsonObject ping_obj); //
+    void parseAltitude(QJsonObject alt_obj); //
+
+    // Control system
+    std::array<double, 4> controllerChannels = {0, 0, 0, 0};
+//    AltitudeController* altController;
+    AltitudeEstimator* altEstimator;
+    // void updateControllerChannels(); // TODO: change
+
+    // Files
+    std::ofstream file_log;
+    bool filesOpen = false;
+    std::string header_log = "time_esp_ms,time_esp_prop,Delta_t_prop_ms,z_prop,z_dot_prop,chnThr,chnEle,chnAil,chnRud";
+    std::string prefix_log = "alt_prop_ctrl_";
+    std::string format = ".txt";
+    std::string suffix = "temp";
+    std::string fileDirectory = "";
+
+
 };
 
 #endif // CONDUCTOR_H
