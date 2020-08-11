@@ -177,7 +177,7 @@ void Conductor::timer_handler(const boost::system::error_code& error)
         auto current_time = std::chrono::steady_clock::now();
         std::string write_str;
         std::ostringstream os;
-        os << "Time diff: " << std::chrono::duration_cast<std::chrono::milliseconds>(current_time.time_since_epoch()).count() << " ms\r\n";
+        os << "Time since epoch: " << (int)std::chrono::duration_cast<std::chrono::milliseconds>(current_time.time_since_epoch()).count() << " ms\r\n";
         write_str = os.str();
         prev_jv_time = current_time;
         esp_port->async_write_some( boost::asio::buffer(write_str), boost::bind(&Conductor::serial_write_handler, this, boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred) );
