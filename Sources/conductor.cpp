@@ -62,7 +62,8 @@ void Conductor::serial_read_handler(const boost::system::error_code& error, std:
             parse_packet(serial_read_concat, start, end);
             
             // Now erase this json packet from serial_read_concat
-            serial_read_concat.erase(serial_read_concat.begin()+start, serial_read_concat.begin()+end+1); // removes the \n as well
+            // Erase elements prior to this json packet
+            serial_read_concat.erase(serial_read_concat.begin(), serial_read_concat.begin()+end+1); // removes the \n as well
         }
 
 
@@ -114,10 +115,9 @@ void Conductor::parse_packet(const std::vector<char> &inVec, const int start, co
             element = 'x';
         }
     }
-
+    
     // Echo the cut vector
     esp_port->async_write_some( boost::asio::buffer(cut_vec), boost::bind(&Conductor::serial_write_handler, this, boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred) );
-
 
     // Catch all exceptions
     // We want to keep the program running
@@ -177,7 +177,7 @@ void Conductor::timer_handler(const boost::system::error_code& error)
         auto current_time = std::chrono::steady_clock::now();
         std::string write_str;
         std::ostringstream os;
-        os << "Time diff: " << std::chrono::duration_cast<std::chrono::microseconds>(current_time - prev_jv_time).count() << " us\r\n";
+        os << "Time diff: " << std::chrono::duration_cast<std::chrono::milliseconds>(current_time.time_since_epoch()).count() << " ms\r\n";
         write_str = os.str();
         prev_jv_time = current_time;
         esp_port->async_write_some( boost::asio::buffer(write_str), boost::bind(&Conductor::serial_write_handler, this, boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred) );
