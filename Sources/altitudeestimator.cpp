@@ -14,8 +14,8 @@ void AltitudeEstimator::resetStateEstimate()
 {
     // TODO: move x_0 and P_0 into header file
     x.fill(0);
-    P << 1000, 100,
-         100, 1;
+    P << 1, 1,
+         1, 1;
     hasPreviousMeasurement = false;
 }
 
@@ -28,7 +28,7 @@ void AltitudeEstimator::addRangeMeasurement(RangingData_t rangeData)
          * Alternative: only set the times, and make the estimator continue
          * with the initialised states
         */
-        x(0,0) = -rangeData.range_mm;
+        x(0,0) = -rangeData.range_mm/1000.0;
         x(1,0) = 0;
         currentTimePc_ms = rangeData.timeEsp_ms;
         currentTimePc_ms = rangeData.timePc_ms;
@@ -37,7 +37,7 @@ void AltitudeEstimator::addRangeMeasurement(RangingData_t rangeData)
     }
 
     // Time delta from previous measurement
-    int Delta_t = rangeData.timeEsp_ms - currentTimeEsp_ms;
+    double Delta_t = (rangeData.timeEsp_ms - currentTimeEsp_ms)/1000.0;
     currentTimeEsp_ms = rangeData.timeEsp_ms;
     currentTimePc_ms = rangeData.timePc_ms;
 
@@ -61,7 +61,7 @@ void AltitudeEstimator::addRangeMeasurement(RangingData_t rangeData)
 
     // Measurement map matrix
     Eigen::Matrix<double, 1, 2> H;
-    H << -1, 0;
+    H << -1000, 0;
 
     // Propagate with constant velocity assumption
     x = F*x;
@@ -112,7 +112,7 @@ AltState_t AltitudeEstimator::getStateEstimate()
 AltState_t AltitudeEstimator::getPropagatedStateEstimate(int newTimePc_ms)
 {
     // Time difference based on PC time
-    int Delta_t = newTimePc_ms - currentTimePc_ms;
+    double Delta_t = (newTimePc_ms - currentTimePc_ms)/1000.0;
 
     // State transition
     Eigen::Matrix<double, 2, 2> F;
@@ -188,11 +188,11 @@ void AltitudeEstimator::closeFiles() {
     filesOpen = false;
 }
 
-void AltitudeEstimator::setSuffix(std::string suffix_in) {
+void AltitudeEstimator::setFileSuffix(std::string suffix_in) {
     suffix = suffix_in;
 }
 
-std::string AltitudeEstimator::getSuffix() {
+std::string AltitudeEstimator::getFileSuffix() {
     return suffix;
 }
 

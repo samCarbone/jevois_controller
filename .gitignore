@@ -33,6 +33,7 @@
 
 # MacOS
 *.DS_store
+.vscode/
 
 # Build
 pbuild/

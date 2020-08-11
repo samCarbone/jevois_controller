@@ -27,8 +27,8 @@ public:
     // File save methods
     bool openFiles();
     void closeFiles();
-    void setSuffix(std::string suffix_in);
-    std::string getSuffix();
+    void setFileSuffix(std::string suffix_in);
+    std::string getFileSuffix();
     void setFileDirectory(std::string directory);
     std::string getFileDirectory();
 

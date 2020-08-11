@@ -14,22 +14,20 @@ public:
     // Methods
     AltitudeController();
     ~AltitudeController();
-    void resetState();
-    void resetIntegral();
-    void addEstState();
-    void addTempEstState();
-    void setTarget();
-    double getControl();
-//    CtrlState_t getControlState();
-//    CtrlState_t getControlTempState();
+    void resetState(); //
+//    void resetIntegral(); //
+    void setTarget(const AltTarget_t target); //
+    void addEstState(const AltState_t newState); //
+    double getControl(); //
+    double getControlTempState(const AltState_t tempState); //
 
     // Attributes
 
     // File save methods
     bool openFiles();
     void closeFiles();
-    void setSuffix(std::string suffix_in);
-    std::string getSuffix();
+    void setFileSuffix(std::string suffix_in);
+    std::string getFileSuffix();
     void setFileDirectory(std::string directory);
     std::string getFileDirectory();
 
@@ -37,13 +35,19 @@ private:
     // Methods
 
     // Attributes
-    bool validState = false;
-    Eigen::Matrix<double, 3, 1> x; // [z (mm), z_dot (mm/ms), z_int (mm.s)]
+    bool validStateSet = false;
+    Eigen::Matrix<double, 3, 1> Dx; // [Delta z (m), Delta z_dot (mm/ms), Delta z_int (m.s)]
+    Eigen::Matrix<double, 2, 1> x_target; // [z (m), z_dot (mm/ms)]
+    int currentTimeEsp_ms;
+    int currentTimePc_ms;
+    bool targetIsSet = false;
+    Eigen::Matrix<double, 1, 3> B; // [P D I]
+    double thrSS = -47.8935;
 
     // File save attributes
     std::ofstream file_alt_ctrl;
     bool filesOpen = false;
-    const std::string header_alt_ctrl = "time_esp_ms,time_pc_ms,z,z_dot,P_11,P_12,P_21,P_22,Delta_t_s,range_mm,sigma_mm,sigma_v";
+    const std::string header_alt_ctrl = "time_esp_ms,time_pc_ms,Delta_z,Delta_z_dot,Delta_z_int,u,P_z,D_z_dot,I_z_int,thrSS,P,D,I";
     const std::string prefix_alt_ctrl = "alt_ctrl_";
     const std::string format = ".txt";
     std::string suffix = "temp";
