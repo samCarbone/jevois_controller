@@ -1,7 +1,6 @@
 #ifndef DEF_H
 #define DEF_H
 
-#include <QObject>
 #include <eigen/Eigen/Dense>
 
 typedef struct {

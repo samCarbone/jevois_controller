@@ -190,7 +190,7 @@ void Conductor::timer_handler(const boost::system::error_code& error)
 
 }
 
-void Conductor::parseAltitude(json &alt_obj)
+void Conductor::parseAltitude(const json &alt_obj)
 {
     if(alt_obj.contains("sigrt") && alt_obj.contains("ambrt") && alt_obj.contains("sigma")
             && alt_obj.contains("spad") && alt_obj.contains("range") && alt_obj.contains("time")
@@ -219,7 +219,7 @@ void Conductor::parseAltitude(json &alt_obj)
 
 }
 
-void Conductor::parseMode(json &mode_obj)
+void Conductor::parseMode(const json &mode_obj)
 {
     if(mode_obj["mode"] == "start") {}
     else if(mode_obj["mode"] == "stop") {}

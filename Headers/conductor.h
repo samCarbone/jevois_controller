@@ -69,10 +69,11 @@ private:
 
     // Comms
     bool sendChannels(const std::array<double, 16> &channels, const bool response=false); //
-    void parse_packet(const std::vector<char> &inVec, const int start, const int end); //
-    void parseMode(QJsonObject mode_obj); //
-    void parsePing(QJsonObject ping_obj); //
-    void parseAltitude(QJsonObject alt_obj); //
+    bool find_first_set(const std::vector<char> &inVec, int &start, int &end);
+    void parse_packet(const std::iterator &start, const std::iterator &end); //
+    void parseMode(const json &mode_obj); //
+    void parsePing(const json &ping_obj); //
+    void parseAltitude(const json &alt_obj); //
 
     // Control system
     std::array<double, 4> controllerChannels = {0, 0, 0, 0};
