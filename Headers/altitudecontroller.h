@@ -2,7 +2,7 @@
 #define ALTITUDECONTROLLER_H
 
 #include <fstream>
-#include <eigen/Eigen/Dense>
+#include <../eigen/Eigen/Dense>
 #include <string>
 #include <iostream>
 #include <math.h>

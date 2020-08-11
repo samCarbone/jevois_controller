@@ -2,19 +2,24 @@
 #define CONDUCTOR_H
 
 #include <iostream>
+#include <fstream>
 #include <string>
 #include <chrono>
 #include <vector>
 #include <array>
+#include <math.h>
+
 #include <boost/asio.hpp>
 #include <boost/bind.hpp>
 #include <boost/asio/serial_port.hpp>
 #include <boost/asio/high_resolution_timer.hpp>
 #include <boost/date_time/posix_time/posix_time.hpp>
-#include "../json/json.hpp"
-#include "def.h"
+#include <nlohmann/json.hpp>
 
-using asio = boost::asio;
+#include "def.h"
+#include "altitudeestimator.h"
+#include "altitudecontroller.h"
+
 using json = nlohmann::json;
 
 class Conductor
@@ -26,18 +31,16 @@ public:
     ~Conductor();        
 
 private:
-    asio::io_service io;
-    asio::serial_port* esp_port;
+    boost::asio::io_service io;
+    boost::asio::serial_port* esp_port;
     void serial_read_handler(const boost::system::error_code& error, std::size_t bytes_transferred);
     void serial_write_handler(const boost::system::error_code& error, std::size_t bytes_transferred);
     std::array<char, 256> serial_read_buffer;
     std::array<char, 256> serial_write_buffer;
     std::vector<char> serial_read_concat;
 
-    bool find_first_set(const std::vector<char> &inVec, int &start, int &end)
-
     std::chrono::steady_clock::time_point prev_jv_time;
-    asio::high_resolution_timer* timer;
+    boost::asio::high_resolution_timer* timer;
     const long control_loop_period_ms = 1000; // ms
     void timer_handler(const boost::system::error_code& error);
 
@@ -70,7 +73,7 @@ private:
     // Comms
     bool sendChannels(const std::array<double, 16> &channels, const bool response=false); //
     bool find_first_set(const std::vector<char> &inVec, int &start, int &end);
-    void parse_packet(const std::iterator &start, const std::iterator &end); //
+    void parse_packet(const std::vector<char> &inVec, const int start, const int end); //
     void parseMode(const json &mode_obj); //
     void parsePing(const json &ping_obj); //
     void parseAltitude(const json &alt_obj); //

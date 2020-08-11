@@ -41,13 +41,19 @@ INCLUDE_DIRECTORIES(Headers)
 set(Boost_LIBRARIES, "/usr/share/jevois-sdk/out/sun8iw5p1/linux/common/buildroot/host/arm-buildroot-linux-gnueabihf/sysroot/usr/include/boost")
 INCLUDE_DIRECTORIES(${Boost_LIBRARIES})
 
+set(JSON_BuildTests OFF CACHE INTERNAL "")
+set(JSON_Install OFF CACHE INTERNAL "")
+add_subdirectory(json)
+
 # add the executable
 add_executable(Main Sources/main.cpp Sources/conductor.cpp)
 
 # add_library(conductor_lib STATIC Sources/conductor.cpp)
 
+
 # link boost library
 TARGET_LINK_LIBRARIES( Main LINK_PUBLIC ${Boost_LIBRARIES} -lboost_system -lboost_regex -lboost_thread -lpthread -ltbb -ldl -lutil -lm)
+TARGET_LINK_LIBRARIES( Main PRIVATE nlohmann_json::nlohmann_json)
 
 # target_link_libraries(jevois ${JEVOIS_OPENCV_LIBS} -lpthread -ltbb -ldl -lutil -lboost_system -lboost_thread -lboost_regex -lturbojpeg -lm ${JEVOIS_PYTHON_LIBS})
 

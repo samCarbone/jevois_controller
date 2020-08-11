@@ -1,7 +1,7 @@
 #ifndef DEF_H
 #define DEF_H
 
-#include <eigen/Eigen/Dense>
+#include <../eigen/Eigen/Dense>
 
 typedef struct {
     double signal_rate; // MCPS
