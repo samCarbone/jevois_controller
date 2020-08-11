@@ -11,7 +11,7 @@
 #include <boost/asio/serial_port.hpp>
 #include <boost/asio/high_resolution_timer.hpp>
 #include <boost/date_time/posix_time/posix_time.hpp>
-#include <nlohmann/json.hpp>
+#include "../json/json.hpp"
 #include "def.h"
 
 using asio = boost::asio;
