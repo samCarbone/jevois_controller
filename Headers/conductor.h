@@ -57,8 +57,8 @@ private:
 
     // Mode
     bool controller_activity = false;
-    set_controller_activity(const bool is_active);
-    get_controller_activity();
+    void set_controller_activity(const bool is_active);
+    bool get_controller_activity();
     bool landing = false;
     void set_landing(bool is_landing);
 
@@ -72,7 +72,7 @@ private:
 
 
     // Comms
-    bool send_channels(const std::array<double, 16> &channels, const bool response=false);
+    void send_channels(const std::array<double, 16> &channels, const bool response=false);
     bool find_first_set(const std::vector<char> &inVec, int &start, int &end);
     void parse_packet(const std::vector<char> &inVec, const int start, const int end);
     void parseMode(const json &mode_obj);
@@ -86,9 +86,9 @@ private:
     // File Methods
     bool open_files(); //
     void close_files(); //
-    void set_file_suffix(std::string &suffix_in); //
+    void set_file_suffix(std::string suffix_in); //
     std::string get_file_suffix(); //
-    void set_file_directory(std::string &directory_in); //
+    void set_file_directory(std::string directory_in); //
     std::string get_file_directory(); //
 
     // Files - general properties
@@ -98,6 +98,7 @@ private:
     std::string file_directory = ".";
     // Logging messages
     std::ofstream file_log;
+    std::string header_log = "*****************************************";
     std::string prefix_log = "log_";
     // control signals
     std::ofstream file_sig;

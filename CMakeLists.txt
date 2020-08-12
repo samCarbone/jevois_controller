@@ -46,7 +46,7 @@ set(JSON_Install OFF CACHE INTERNAL "")
 add_subdirectory(json)
 
 # add the executable
-add_executable(Main Sources/main.cpp Sources/conductor.cpp)
+add_executable(Main Sources/main.cpp Sources/conductor.cpp Sources/altitudeestimator.cpp Sources/altitudecontroller.cpp)
 
 # add_library(conductor_lib STATIC Sources/conductor.cpp)
 

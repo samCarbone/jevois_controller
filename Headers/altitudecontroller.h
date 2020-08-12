@@ -17,7 +17,7 @@ public:
     void resetState(); //
 //    void resetIntegral(); //
     void setTarget(const AltTarget_t target); //
-    bool getTarget(AltTarget_t &target_out)
+    bool getTarget(AltTarget_t &target_out);
     void addEstState(const AltState_t newState); //
     double getControl(); //
     double getControlTempState(const AltState_t tempState); //
@@ -28,9 +28,9 @@ public:
     // File save methods
     bool open_files();
     void close_files();
-    void set_file_suffix(std::string &suffix_in);
+    void set_file_suffix(std::string suffix_in);
     std::string get_file_suffix();
-    void set_file_directory(std::string &directory_in);
+    void set_file_directory(std::string directory_in);
     std::string get_file_directory();
 
 private:

@@ -189,7 +189,7 @@ void AltitudeEstimator::close_files() {
     files_open = false;
 }
 
-void AltitudeEstimator::set_file_suffix(std::string &suffix_in) {
+void AltitudeEstimator::set_file_suffix(std::string suffix_in) {
     suffix = suffix_in;
 }
 
@@ -197,7 +197,7 @@ std::string AltitudeEstimator::get_file_suffix() {
     return suffix;
 }
 
-void AltitudeEstimator::set_file_directory(std::string &directory_in) {
+void AltitudeEstimator::set_file_directory(std::string directory_in) {
     file_directory = directory_in;
 }
 

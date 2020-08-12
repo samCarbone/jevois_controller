@@ -131,7 +131,7 @@ void AltitudeController::close_files() {
     files_open = false;
 }
 
-void AltitudeController::set_file_suffix(std::string &suffix_in) {
+void AltitudeController::set_file_suffix(std::string suffix_in) {
     suffix = suffix_in;
 }
 
@@ -139,7 +139,7 @@ std::string AltitudeController::get_file_suffix() {
     return suffix;
 }
 
-void AltitudeController::set_file_directory(std::string &directory_in) {
+void AltitudeController::set_file_directory(std::string directory_in) {
     file_directory = directory_in;
 }
 

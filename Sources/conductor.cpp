@@ -121,6 +121,7 @@ bool Conductor::find_first_set(const std::vector<char> &inVec, int &start, int &
             }
         }
     }
+    
 
     return false;    
 
@@ -129,13 +130,17 @@ bool Conductor::find_first_set(const std::vector<char> &inVec, int &start, int &
 void Conductor::parse_packet(const std::vector<char> &inVec, const int start, const int end)
 {
     // Could copy into a new vector for convenience
-    const std::vector<char> cut_vec(inVec.begin()+start, inVec.begin()+end);
-    for (char element : cut_vec) {
-        if(element < 0 || element > 127) {
-            element = 'x';
+    std::vector<char> cut_vec(inVec.begin()+start, inVec.begin()+end);
+    for (int i=0; i<cut_vec.size(); i++) {
+        if(cut_vec.at(i) <= 31) {
+            cut_vec.at(i) = 'x';
         }
     }
-    
+    // The problem is character 0x22 i.e. "
+    // Best solution would be to just search for and cut out the msp data
+
+    // MSP search ({,)"msp":"*"(,})
+
     // Echo the cut vector
     // esp_port->async_write_some( boost::asio::buffer(cut_vec), boost::bind(&Conductor::serial_write_handler, this, boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred) );
 
@@ -147,7 +152,7 @@ void Conductor::parse_packet(const std::vector<char> &inVec, const int start, co
             return;
 
         std::string s = j_doc.dump();
-        s += '\n';
+        s += '\r\n';
         esp_port->async_write_some( boost::asio::buffer(s), boost::bind(&Conductor::serial_write_handler, this, boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred) );
 
         if (j_doc["dst"] != "jv") {return;}
@@ -252,15 +257,15 @@ int Conductor::value_to_tx_range(double value)
     return round(value*6 + 1500); // Scaled from (-100, 100) to (900, 2100)
 }
 
-double Conductor::saturate(doube channel_value)
+double Conductor::saturate(double channel_value)
 {
-    if (channelValue > MAX_CHANNEL_VALUE) {
-        channelValue = MAX_CHANNEL_VALUE;
+    if (channel_value > MAX_CHANNEL_VALUE) {
+        channel_value = MAX_CHANNEL_VALUE;
     }
-    else if (channelValue < MIN_CHANNEL_VALUE) {
-        channelValue = MIN_CHANNEL_VALUE;
+    else if (channel_value < MIN_CHANNEL_VALUE) {
+        channel_value = MIN_CHANNEL_VALUE;
     }
-    return channelValue;
+    return channel_value;
 }
 
 
@@ -332,8 +337,8 @@ void Conductor::timer_handler(const boost::system::error_code& error)
             if(files_open) {
                 // header
                 // "time_esp_ms,time_esp_prop,Delta_t_prop_ms,z_prop,z_dot_prop,chnThr,chnEle,chnAil,chnRud"
-                file_sig << altEstimator->getCurrentTimeEsp_ms() << "," << propAltState.timeEsp_ms << "," << propAltState.timeEsp_ms-altEstimator->getCurrentTimeEsp_ms() << ","
-                         << propAltState.z << "," << propAltState.z_dot << "," << chnThr << "," << chnEle << "," << chnAil << "," << chnRud << std::endl;
+                file_sig << alt_estimator->getCurrentTimeEsp_ms() << "," << prop_alt_state.timeEsp_ms << "," << prop_alt_state.timeEsp_ms-alt_estimator->getCurrentTimeEsp_ms() << ","
+                         << prop_alt_state.z << "," << prop_alt_state.z_dot << "," << chn_thr << "," << chn_ele << "," << chn_ail << "," << chn_rud << std::endl;
             }
 
         }
@@ -344,7 +349,7 @@ void Conductor::timer_handler(const boost::system::error_code& error)
 
 
 
-void Conductor::send_channels(const std::array<double, 16> &channels, const bool response=false)
+void Conductor::send_channels(const std::array<double, 16> &channels, const bool response)
 {
 
     // auto current_time = std::chrono::steady_clock::now();
@@ -367,7 +372,7 @@ void Conductor::send_channels(const std::array<double, 16> &channels, const bool
 
     // Channel values
     for(auto value : channels) {
-        int rangedValue = channelToTxRange(value);
+        int rangedValue = value_to_tx_range(value);
         char lower_byte = static_cast<char>(rangedValue & 0xFF);
         char upper_byte = static_cast<char>((rangedValue & 0xFF00) >> 8);
 
@@ -433,8 +438,8 @@ bool Conductor::open_files()
 
     bool status = file_log.is_open();
     status &= file_sig.is_open();
-    status &= alt_estimator->openFiles();
-    status &= alt_controller->openFiles();
+    status &= alt_estimator->open_files();
+    status &= alt_controller->open_files();
 
     files_open = status;
 
@@ -451,7 +456,7 @@ void Conductor::close_files()
     files_open = false;
 }
 
-void Conductor::set_file_suffix(std::string &suffix_in)
+void Conductor::set_file_suffix(std::string suffix_in)
 {
     suffix = suffix_in;
     alt_estimator->set_file_suffix(suffix);
@@ -463,7 +468,7 @@ std::string Conductor::get_file_suffix()
     return suffix;
 }
 
-void Conductor::set_file_directory(std::string &directory_in)
+void Conductor::set_file_directory(std::string directory_in)
 {
     alt_estimator->set_file_directory(directory_in);
     alt_controller->set_file_directory(directory_in);
