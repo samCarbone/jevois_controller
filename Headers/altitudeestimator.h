@@ -25,12 +25,12 @@ public:
     // Attributes
 
     // File save methods
-    bool openFiles();
-    void closeFiles();
-    void setFileSuffix(std::string suffix_in);
-    std::string getFileSuffix();
-    void setFileDirectory(std::string directory);
-    std::string getFileDirectory();
+    bool open_files();
+    void close_files();
+    void set_file_suffix(std::string &suffix_in);
+    std::string get_file_suffix();
+    void set_file_directory(std::string &directory_in);
+    std::string get_file_directory();
 
 private:
     // Methods
@@ -45,14 +45,14 @@ private:
 
     // File save attributes
     std::ofstream file_alt_est;
-    bool filesOpen = false;
+    bool files_open = false;
     const std::string header_alt_est = "time_esp_ms,time_pc_ms,z,z_dot,P_11,P_12,P_21,P_22,Delta_t_ms,sigma_v,range_mm,sigma_mm,signal_rate,ambient_rate,eff_spad_count,status";
     const std::string prefix_alt_est = "alt_est_";
 //    std::string header_alt_meas = "time_esp_ms,time_recv_ms,range_mm,sigma_mm,signal_rate,ambient_rate,eff_spad_count,status";
 //    std::string prefix_alt_meas = "alt_meas_";
     const std::string format = ".txt";
-    std::string suffix = "temp";
-    std::string fileDirectory = "";
+    std::string suffix = "jv";
+    std::string file_directory = ".";
 
 
 };

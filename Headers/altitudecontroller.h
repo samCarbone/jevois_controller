@@ -17,19 +17,21 @@ public:
     void resetState(); //
 //    void resetIntegral(); //
     void setTarget(const AltTarget_t target); //
+    bool getTarget(AltTarget_t &target_out)
     void addEstState(const AltState_t newState); //
     double getControl(); //
     double getControlTempState(const AltState_t tempState); //
+    bool isValidState();
 
     // Attributes
 
     // File save methods
-    bool openFiles();
-    void closeFiles();
-    void setFileSuffix(std::string suffix_in);
-    std::string getFileSuffix();
-    void setFileDirectory(std::string directory);
-    std::string getFileDirectory();
+    bool open_files();
+    void close_files();
+    void set_file_suffix(std::string &suffix_in);
+    std::string get_file_suffix();
+    void set_file_directory(std::string &directory_in);
+    std::string get_file_directory();
 
 private:
     // Methods
@@ -46,12 +48,12 @@ private:
 
     // File save attributes
     std::ofstream file_alt_ctrl;
-    bool filesOpen = false;
+    bool files_open = false;
     const std::string header_alt_ctrl = "time_esp_ms,time_pc_ms,Delta_z,Delta_z_dot,Delta_z_int,u,P_z,D_z_dot,I_z_int,thrSS,P,D,I";
     const std::string prefix_alt_ctrl = "alt_ctrl_";
     const std::string format = ".txt";
-    std::string suffix = "temp";
-    std::string fileDirectory = "";
+    std::string suffix = "jv";
+    std::string file_directory = ".";
 
 };
 

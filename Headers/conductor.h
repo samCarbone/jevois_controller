@@ -39,59 +39,71 @@ private:
     std::array<char, 256> serial_write_buffer;
     std::vector<char> serial_read_concat;
 
-    std::chrono::steady_clock::time_point prev_jv_time;
-    boost::asio::high_resolution_timer* timer;
-    const long control_loop_period_ms = 1000; // ms
-    void timer_handler(const boost::system::error_code& error);
-
-    bool controllerActive = false;
-    bool getControllerActive();
-    void setControllerActive(const bool ctrlActv);
-
-    // Files
-    bool openFiles(); //
-    void closeFiles(); //
-    void setFileSuffix(std::string suffix_in); //
-    std::string getFileSuffix(); //
-    void setFileDirectory(std::string directory); //
-    std::string getFileDirectory(); //
 
     void sendTimerDone();
+
+    const int SEND_CONTROL_PERIOD_MS = 50; // ms, time between sending control commansd
+    const int PROP_TIMEOUT = 100;
 
 
     // Channels
     const double MAX_CHANNEL_VALUE = 100;
     const double MIN_CHANNEL_VALUE = -100;
     const unsigned char MSP_CHANNEL_ID = 200;
-    void setJoyChannelValue(const int channel, double value);
-    static int channelToTxRange(double value);
+    std::array<double, 4> controller_channels = {0, 0, 0, 0};
+    double get_controller_channel_value(const int channel);
+    int value_to_tx_range(double value);
     double saturate(double channelValue);
 
-    const int SEND_CONTROL_PERIOD_MS = 50; // ms, time between sending control commansd
-    const int PROP_TIMEOUT = 100;
+    // Mode
+    bool controller_activity = false;
+    set_controller_activity(const bool is_active);
+    get_controller_activity();
+    bool landing = false;
+    void set_landing(bool is_landing);
+
+    // Send Timer
+    std::chrono::steady_clock::time_point start_time_jv;
+    boost::asio::high_resolution_timer* send_timer;
+    const long CONTROL_LOOP_PERIOD_MS = 50; // ms
+    void timer_handler(const boost::system::error_code& error);
+    int time_elapsed_ms();
+
+
 
     // Comms
-    bool sendChannels(const std::array<double, 16> &channels, const bool response=false); //
+    bool send_channels(const std::array<double, 16> &channels, const bool response=false);
     bool find_first_set(const std::vector<char> &inVec, int &start, int &end);
-    void parse_packet(const std::vector<char> &inVec, const int start, const int end); //
-    void parseMode(const json &mode_obj); //
-    void parsePing(const json &ping_obj); //
-    void parseAltitude(const json &alt_obj); //
+    void parse_packet(const std::vector<char> &inVec, const int start, const int end);
+    void parseMode(const json &mode_obj);
+    void parsePing(const json &ping_obj);
+    void parseAltitude(const json &alt_obj);
 
     // Control system
-    std::array<double, 4> controllerChannels = {0, 0, 0, 0};
-    AltitudeController* altController;
-    AltitudeEstimator* altEstimator;
+    AltitudeController* alt_controller;
+    AltitudeEstimator* alt_estimator;
 
+    // File Methods
+    bool open_files(); //
+    void close_files(); //
+    void set_file_suffix(std::string &suffix_in); //
+    std::string get_file_suffix(); //
+    void set_file_directory(std::string &directory_in); //
+    std::string get_file_directory(); //
 
-    // Files
-    std::ofstream file_log;
-    bool filesOpen = false;
-    std::string header_log = "time_esp_ms,time_esp_prop,Delta_t_prop_ms,z_prop,z_dot_prop,chnThr,chnEle,chnAil,chnRud";
-    std::string prefix_log = "alt_prop_ctrl_";
+    // Files - general properties
+    bool files_open = false;
     std::string format = ".txt";
-    std::string suffix = "temp";
-    std::string fileDirectory = "";
+    std::string suffix = "jv";
+    std::string file_directory = ".";
+    // Logging messages
+    std::ofstream file_log;
+    std::string prefix_log = "log_";
+    // control signals
+    std::ofstream file_sig;
+    std::string header_sig = "time_esp_ms,time_esp_prop,Delta_t_prop_ms,z_prop,z_dot_prop,chnThr,chnEle,chnAil,chnRud";
+    std::string prefix_sig = "alt_prop_ctrl_";
+    
 
 };
 

@@ -7,7 +7,7 @@ AltitudeEstimator::AltitudeEstimator()
 
 AltitudeEstimator::~AltitudeEstimator()
 {
-    closeFiles();
+    close_files();
 }
 
 void AltitudeEstimator::resetStateEstimate()
@@ -87,7 +87,7 @@ void AltitudeEstimator::addRangeMeasurement(RangingData_t rangeData)
     P = (Eigen::MatrixXd::Identity(2,2) - K*H)*P*((Eigen::MatrixXd::Identity(2,2) - K*H).transpose()) + K*R*K.transpose();
 
     // File writes
-    if(filesOpen) {
+    if(files_open) {
         // header
         // time_esp_ms,time_pc_ms,z,z_dot,P_11,P_12,P_21,P_22,Delta_t_ms,sigma_v,range_mm,sigma_mm,signal_rate,ambient_rate,eff_spad_count,status
         file_alt_est << currentTimeEsp_ms << "," << currentTimePc_ms << "," << x(0,0) << "," << x(1,0) << ","
@@ -168,14 +168,15 @@ int AltitudeEstimator::getCurrentTimeEsp_ms()
 // File Methods
 // **********************************************************************
 
-bool AltitudeEstimator::openFiles() {
-    if (file_alt_est.is_open())
-        return false;
-    std::string name_alt_est = fileDirectory + "/" + prefix_alt_est + suffix + format;
-    file_alt_est.open(name_alt_est, std::ios::out | std::ios::app); // Append the file contents to prevent overwrite
-    if (file_alt_est.is_open()) {
+bool AltitudeEstimator::open_files() {
+    if(!file_alt_est.is_open()) {
+        std::string name_alt_est = file_directory + "/" + prefix_alt_est + suffix + format;
+        file_alt_est.open(name_alt_est, std::ios::out | std::ios::app); // Append the file contents to prevent overwrite
+    }
+        
+    if(file_alt_est.is_open()) {
         file_alt_est << std::endl << header_alt_est << std::endl;
-        filesOpen = true;
+        files_open = true;
         return true;
     }
     else {
@@ -183,24 +184,24 @@ bool AltitudeEstimator::openFiles() {
     }
 }
 
-void AltitudeEstimator::closeFiles() {
+void AltitudeEstimator::close_files() {
     file_alt_est.close();
-    filesOpen = false;
+    files_open = false;
 }
 
-void AltitudeEstimator::setFileSuffix(std::string suffix_in) {
+void AltitudeEstimator::set_file_suffix(std::string &suffix_in) {
     suffix = suffix_in;
 }
 
-std::string AltitudeEstimator::getFileSuffix() {
+std::string AltitudeEstimator::get_file_suffix() {
     return suffix;
 }
 
-void AltitudeEstimator::setFileDirectory(std::string directory) {
-    fileDirectory = directory;
+void AltitudeEstimator::set_file_directory(std::string &directory_in) {
+    file_directory = directory_in;
 }
 
-std::string AltitudeEstimator::getFileDirectory()
+std::string AltitudeEstimator::get_file_directory()
 {
-    return fileDirectory;
+    return file_directory;
 }
