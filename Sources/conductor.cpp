@@ -99,7 +99,7 @@ bool Conductor::find_first_json(const std::vector<char> &inVec, int &start, int 
     bool found_start = false;
     start = 0;
     end = 0;
-
+    std::array<char, 3> DELIM = {'}', '\r', '\n'};
     // Search for the start
     for(int i=0; i<inVec.size()-DELIM.size(); i++) {
         if(inVec.at(i) == '{') {
@@ -111,7 +111,6 @@ bool Conductor::find_first_json(const std::vector<char> &inVec, int &start, int 
 
     if(found_start) {
         // Search for the end
-    	std::array<char, 3> DELIM = {'}', '\r', '\n'};
         for(int i=start+1; i<inVec.size()-DELIM.size()+1; i++) {
             bool is_end = true;
             for(int j=0; j<DELIM.size()&&is_end; j++) {
@@ -132,11 +131,11 @@ bool Conductor::find_first_json(const std::vector<char> &inVec, int &start, int 
 bool Conductor::find_first_msp(const std::vector<char> &inVec, int &start, int &end)
 {
 
-    const std::array<char> chrs_option_1 = {'{',','};
-    const std::array<char> chrs_2 = {'\"', 'm', 's','p','\"',':','\"'};
+    const std::array<char, 2> chrs_option_1 = {'{',','};
+    const std::array<char, 7> chrs_2 = {'\"', 'm', 's','p','\"',':','\"'};
     bool found_start = false;
     const char chr_3 = '\"';
-    const std::array<char> chrs_option_4 = {',','}'};
+    const std::array<char, 2> chrs_option_4 = {',','}'};
     start = 0;
     end = 0;
     int expected_end = 0;
@@ -169,8 +168,8 @@ bool Conductor::find_first_msp(const std::vector<char> &inVec, int &start, int &
         if(found_start) {
             start = i+chrs_2.size();
             // the msp message length is read and used to find the end
-            message_len = static_cast<unsigned char>(inVec.at(start+4))
-            expected_end = start + min_msp_len + message_len + 1;
+            unsigned char message_len = static_cast<unsigned char>(inVec.at(start+4));
+            expected_end = start + min_msp_len + static_cast<int>(message_len) + 1;
             break;
         }
 
@@ -221,10 +220,12 @@ void Conductor::parse_packet(const std::vector<char> &inVec, const int start, co
     // MSP search ({,)"msp":"*"(,})
     std::vector<char> msp_vec;
     bool found_msp = false;
-    while(find_first_msp(cut_vec, start, end)) {
+    int start_msp = 0;
+    int end_msp = 0;
+    while(find_first_msp(cut_vec, start_msp, end_msp)) {
         if(!found_msp) {
-            msp_vec.insert(msp_vec.begin(), cut_vec.begin()+start+1, cut_vec.begin()+end);
-            cut_vec.erase(cut_vec.begin()+start+1, cut_vec.begin()+end);
+            msp_vec.insert(msp_vec.begin(), cut_vec.begin()+start_msp+1, cut_vec.begin()+end_msp);
+            cut_vec.erase(cut_vec.begin()+start_msp+1, cut_vec.begin()+end_msp);
             found_msp = true;
         }
     }
@@ -381,14 +382,14 @@ void Conductor::parse_mode(const json &mode_obj)
 
 void Conductor::parse_landing(const json &land_obj)
 {
-    if(mode_obj["land"]) == "true") {
+    if(land_obj["land"] == "true") {
         set_landing(true);
     }
-    else if(mode_obj["land"] == "false") {
+    else if(land_obj["land"] == "false") {
         set_landing(false);
     }
 
-    if(mode_obj["rsp"] == "true") {
+    if(land_obj["rsp"] == "true") {
         send_landing(landing);
     }
 }
