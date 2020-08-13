@@ -74,8 +74,8 @@ void Conductor::serial_read_handler(const boost::system::error_code& error, std:
         serial_read_concat.insert(serial_read_concat.end(), serial_read_buffer.begin(), serial_read_buffer.begin()+bytes_transferred);
 
         int start, end;
-        while(find_first_set(serial_read_concat, start, end)) {
-            // Include the first character of the delimiter (i.e. the '}' of "}\n")
+        while(find_first_json(serial_read_concat, start, end)) {
+            // Include the first character of the delimiter (i.e. the '}' of "}\r\n")
             end++;
 
             // Parse it
@@ -83,7 +83,7 @@ void Conductor::serial_read_handler(const boost::system::error_code& error, std:
             
             // Now erase this json packet from serial_read_concat
             // Erase elements prior to this json packet
-            serial_read_concat.erase(serial_read_concat.begin(), serial_read_concat.begin()+end+1); // removes the \n as well
+            serial_read_concat.erase(serial_read_concat.begin(), serial_read_concat.begin()+end+2); // removes the \r\n as well
         }
 
 
@@ -93,13 +93,15 @@ void Conductor::serial_read_handler(const boost::system::error_code& error, std:
 
 }
 
-bool Conductor::find_first_set(const std::vector<char> &inVec, int &start, int &end)
+bool Conductor::find_first_json(const std::vector<char> &inVec, int &start, int &end)
 {
 
     bool found_start = false;
+    start = 0;
+    end = 0;
 
     // Search for the start
-    for(int i=0; i<inVec.size(); i++) {
+    for(int i=0; i<inVec.size()-DELIM.size(); i++) {
         if(inVec.at(i) == '{') {
             start = i;
             found_start = true;
@@ -109,10 +111,10 @@ bool Conductor::find_first_set(const std::vector<char> &inVec, int &start, int &
 
     if(found_start) {
         // Search for the end
-    	std::array<char, 2> DELIM = {'}', '\n'};
-        for(int i=start; i<inVec.size()-DELIM.size()+1; i++) {
+    	std::array<char, 3> DELIM = {'}', '\r', '\n'};
+        for(int i=start+1; i<inVec.size()-DELIM.size()+1; i++) {
             bool is_end = true;
-            for(int j=0; j<DELIM.size(); j++) {
+            for(int j=0; j<DELIM.size()&&is_end; j++) {
                 is_end &= serial_read_concat.at(i+j) == DELIM.at(j);
             }
             if(is_end) {
@@ -127,6 +129,82 @@ bool Conductor::find_first_set(const std::vector<char> &inVec, int &start, int &
 
 }
 
+bool Conductor::find_first_msp(const std::vector<char> &inVec, int &start, int &end)
+{
+
+    const std::array<char> chrs_option_1 = {'{',','};
+    const std::array<char> chrs_2 = {'\"', 'm', 's','p','\"',':','\"'};
+    bool found_start = false;
+    const char chr_3 = '\"';
+    const std::array<char> chrs_option_4 = {',','}'};
+    start = 0;
+    end = 0;
+    int expected_end = 0;
+    const int min_msp_len = 6;
+
+    // Find the start
+    for(int i=0; i<inVec.size()-chrs_2.size()-2-min_msp_len; i++) {
+
+        // Check for the first character
+        // one OR the other
+        for(auto &opt : chrs_option_1) {
+            if(inVec.at(i) == opt) {
+                found_start = true;
+                break;
+            }
+        }
+        if(!found_start)
+            continue;
+
+        // Check for the next sequence of characters
+        for(int j=0; j<chrs_2.size(); j++) {
+
+            if(inVec.at(i+1+j) != chrs_2.at(j)) {
+                found_start = false;
+                break;
+            }
+
+        }
+
+        if(found_start) {
+            start = i+chrs_2.size();
+            // the msp message length is read and used to find the end
+            message_len = static_cast<unsigned char>(inVec.at(start+4))
+            expected_end = start + min_msp_len + message_len + 1;
+            break;
+        }
+
+    }
+
+    if(found_start) {
+
+        // Find the end. Note: this will find a closing quotation mark of
+        // another element if it is missing for the msp message.
+        // this means that the end position is >= real msp end
+        for(int i=expected_end; i<inVec.size()-1; i++) {
+            bool found_end = false;
+
+            if(inVec.at(i) != chr_3)
+                continue;
+
+            for(auto &opt: chrs_option_4) {
+                if(inVec.at(i+1) == opt) {
+                    found_end = true;
+                    break;
+                }
+            }
+            if(found_end) {
+                end = i;
+                return true;
+            }
+        }
+
+    }
+
+    return false;
+
+}
+
 void Conductor::parse_packet(const std::vector<char> &inVec, const int start, const int end)
 {
     // Could copy into a new vector for convenience
@@ -136,35 +214,47 @@ void Conductor::parse_packet(const std::vector<char> &inVec, const int start, co
             cut_vec.at(i) = 'x';
         }
     }
-    // The problem is character 0x22 i.e. "
-    // Best solution would be to just search for and cut out the msp data
 
+    /* Note: this does not support multiple msp messages
+    within a single json packet. It will use the first msp message.
+    */
     // MSP search ({,)"msp":"*"(,})
+    std::vector<char> msp_vec;
+    bool found_msp = false;
+    while(find_first_msp(cut_vec, start, end)) {
+        if(!found_msp) {
+            msp_vec.insert(msp_vec.begin(), cut_vec.begin()+start+1, cut_vec.begin()+end);
+            cut_vec.erase(cut_vec.begin()+start+1, cut_vec.begin()+end);
+            found_msp = true;
+        }
+    }
 
     // Echo the cut vector
     // esp_port->async_write_some( boost::asio::buffer(cut_vec), boost::bind(&Conductor::serial_write_handler, this, boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred) );
 
     // Catch all exceptions
-    // We want to keep the program running
+    // We want to keep the program running and just ignore invalid json packets
     try {
         json j_doc = json::parse(cut_vec);
         if(j_doc.is_null())
             return;
 
-        std::string s = j_doc.dump();
-        s += '\r\n';
-        esp_port->async_write_some( boost::asio::buffer(s), boost::bind(&Conductor::serial_write_handler, this, boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred) );
+        // Echo the json packet
+        // std::string s = j_doc.dump();
+        // s += '\r\n';
+        // esp_port->async_write_some( boost::asio::buffer(s), boost::bind(&Conductor::serial_write_handler, this, boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred) );
 
         if (j_doc["dst"] != "jv") {return;}
 
         if(j_doc["snd"] == "esp") {
 
             if(j_doc["typ"] == "alt") {
-                // parseAltitude(j_doc["alt"]);
+                parse_altitude(j_doc["alt"]);
             }
             
             else if(j_doc["typ"] == "msp") {
                 // Need to search for the msp bytes
+                // parse_msp(std::vector<char> msp_vec);
             }
 
         }
@@ -172,7 +262,11 @@ void Conductor::parse_packet(const std::vector<char> &inVec, const int start, co
         else if (j_doc["snd"] == "pc") {
 
             if(j_doc["typ"] == "mode") {
-                // parseMode(j_doc);
+                parse_mode(j_doc);
+            }
+
+            else if(j_doc["typ"] == "land") {
+                parse_landing(j_doc);
             }
 
         }
@@ -194,43 +288,34 @@ void Conductor::serial_write_handler(const boost::system::error_code& error, std
 
 
 
-// void Conductor::parseAltitude(const json &alt_obj)
-// {
-//     if(alt_obj.contains("sigrt") && alt_obj.contains("ambrt") && alt_obj.contains("sigma")
-//             && alt_obj.contains("spad") && alt_obj.contains("range") && alt_obj.contains("time")
-//             && alt_obj.contains("status") )
-//     {
-//         RangingData_t altData;
-//         altData.signal_rate = alt_obj["sigrt"].get<double>();
-//         altData.ambient_rate = alt_obj["ambrt"].get<double>();
-//         altData.sigma_mm = alt_obj["sigma"].get<double>();
-//         altData.eff_spad_count = alt_obj["spad"].get<double>()/256; // divide by 256 for real value
-//         altData.range_mm = alt_obj["range"].get<int>();
-//         altData.timeEsp_ms = alt_obj["time"].get<int>();
-//         altData.status = alt_obj["status"].get<int>();
-// 	auto now = std::chrono::steady_clock::now();
-//         altData.timePc_ms = (int)std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch()).count();
+void Conductor::parse_altitude(const json &alt_obj)
+{
+    if(alt_obj.contains("sigrt") && alt_obj.contains("ambrt") && alt_obj.contains("sigma")
+            && alt_obj.contains("spad") && alt_obj.contains("range") && alt_obj.contains("time")
+            && alt_obj.contains("status") )
+    {
+        RangingData_t altData;
+        altData.signal_rate = alt_obj["sigrt"].get<double>();
+        altData.ambient_rate = alt_obj["ambrt"].get<double>();
+        altData.sigma_mm = alt_obj["sigma"].get<double>();
+        altData.eff_spad_count = alt_obj["spad"].get<double>()/256.0; // divide by 256 for real value
+        altData.range_mm = alt_obj["range"].get<int>();
+        altData.timeEsp_ms = alt_obj["time"].get<int>();
+        altData.status = alt_obj["status"].get<int>();
+        altData.timePc_ms = time_elapsed_ms();
 
-//         // Update state estimate
-//         altEstimator->addRangeMeasurement(altData);
-//         AltState_t estimatedState = altEstimator->getStateEstimate();
+        // Update state estimate
+        alt_estimator->addRangeMeasurement(altData);
+        AltState_t estimatedState = alt_estimator->getStateEstimate();
 
-//         // Update controller
-//         if(controllerActive) {
-//             altController->addEstState(estimatedState);
-//         }
+        // Update controller
+        if(controller_activity) {
+            alt_controller->addEstState(estimatedState);
+        }
 
-//     }
+    }
 
-// }
-
-// void Conductor::parseMode(const json &mode_obj)
-// {
-//     if(mode_obj["mode"] == "start") {}
-//     else if(mode_obj["mode"] == "stop") {}
-//     else if(mode_obj["mode"] == "quit") {}
-
-// }
+}
 
 
 // **********************************************************
@@ -273,8 +358,44 @@ double Conductor::saturate(double channel_value)
 // Mode
 // **********************************************************
 
+void Conductor::parse_mode(const json &mode_obj)
+{
+    if(mode_obj["mode"] == "start") {
+        set_controller_activity(true);
+    }
+    else if(mode_obj["mode"] == "stop") {
+        set_controller_activity(false);
+    }
+    else if(mode_obj["mode"] == "quit") {
+        set_controller_activity(false);
+        esp_port->cancel();
+        esp_port->close();
+        send_timer->cancel();
+    }
+
+    if(mode_obj["rsp"] == "true") {
+        send_mode(controller_activity);
+    }
+
+}
+
+void Conductor::parse_landing(const json &land_obj)
+{
+    if(mode_obj["land"]) == "true") {
+        set_landing(true);
+    }
+    else if(mode_obj["land"] == "false") {
+        set_landing(false);
+    }
+
+    if(mode_obj["rsp"] == "true") {
+        send_landing(landing);
+    }
+}
+
 void Conductor::set_controller_activity(const bool is_active)
 {
+    landing = false;
     controller_activity = is_active;
     alt_controller->resetState();
 
@@ -296,6 +417,33 @@ void Conductor::set_landing(bool is_landing)
     landing = is_landing;
 }
 
+void Conductor::send_mode(const bool active)
+{
+    json send_doc;
+    send_doc["snd"] = "jv";
+    send_doc["dst"] = "pc";
+    send_doc["mode"] = active ? "true" : "false";
+
+    // Echo the json packet
+    std::string s = send_doc.dump();
+    s += "\r\n";
+    esp_port->async_write_some( boost::asio::buffer(s), boost::bind(&Conductor::serial_write_handler, this, boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred) );
+
+}
+
+void Conductor::send_landing(const bool active)
+{
+    json send_doc;
+    send_doc["snd"] = "jv";
+    send_doc["dst"] = "pc";
+    send_doc["land"] = active ? "true" : "false";
+
+    // Echo the json packet
+    std::string s = send_doc.dump();
+    s += "\r\n";
+    esp_port->async_write_some( boost::asio::buffer(s), boost::bind(&Conductor::serial_write_handler, this, boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred) );
+
+}
 
 // **********************************************************
 // Send Timer
@@ -392,7 +540,7 @@ void Conductor::send_channels(const std::array<double, 16> &channels, const bool
     std::string pre_string = "{\"snd\":\"pc\",\"dst\":\"fc\",\"typ\":\"msp\",\"rsp\":";
     pre_string += response ? "\"true\"" : "\"false\"";
     pre_string += ",\"ctrl\":\"true\",\"msp\":\"";
-    std::string post_string = "\"}";
+    std::string post_string = "\"}\r\n";
 
     std::vector<char> all_data(pre_string.begin(), pre_string.end());
     all_data.insert(all_data.end(), msp_data.begin(), msp_data.end());
@@ -402,12 +550,6 @@ void Conductor::send_channels(const std::array<double, 16> &channels, const bool
     esp_port->async_write_some( boost::asio::buffer(all_data), boost::bind(&Conductor::serial_write_handler, this, boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred) );
 
 }
-
-
-
-
-
-
 
 
 // **********************************************************

@@ -69,15 +69,16 @@ private:
     void timer_handler(const boost::system::error_code& error);
     int time_elapsed_ms();
 
-
-
     // Comms
     void send_channels(const std::array<double, 16> &channels, const bool response=false);
-    bool find_first_set(const std::vector<char> &inVec, int &start, int &end);
+    bool find_first_json(const std::vector<char> &inVec, int &start, int &end);
+    bool find_first_msp(const std::vector<char> &inVec, int &start, int &end);
     void parse_packet(const std::vector<char> &inVec, const int start, const int end);
-    void parseMode(const json &mode_obj);
-    void parsePing(const json &ping_obj);
-    void parseAltitude(const json &alt_obj);
+    void parse_mode(const json &mode_obj);
+    void parse_landing(const json &land_obj);
+    void parse_altitude(const json &alt_obj);
+    void send_mode(const bool active);
+    void send_landing(const bool active);
 
     // Control system
     AltitudeController* alt_controller;
