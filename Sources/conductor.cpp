@@ -40,6 +40,8 @@ Conductor::Conductor(std::string serial_port_name)
     set_file_directory("./logs");
     open_files();
 
+    pub_log_check("Started", INFO, true);
+
     // Run boost io
     io.run();
 
@@ -88,6 +90,9 @@ void Conductor::serial_read_handler(const boost::system::error_code& error, std:
 
 
     }
+    else {
+        pub_log_check("Serial read error", ERROR, true);
+    }
 
     esp_port->async_read_some(boost::asio::buffer(serial_read_buffer), boost::bind(&Conductor::serial_read_handler, this, boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred));
 
@@ -114,7 +119,7 @@ bool Conductor::find_first_json(const std::vector<char> &inVec, int &start, int 
         for(int i=start+1; i<inVec.size()-DELIM.size()+1; i++) {
             bool is_end = true;
             for(int j=0; j<DELIM.size()&&is_end; j++) {
-                is_end &= serial_read_concat.at(i+j) == DELIM.at(j);
+                is_end &= inVec.at(i+j) == DELIM.at(j);
             }
             if(is_end) {
                 end = i;
@@ -222,12 +227,10 @@ void Conductor::parse_packet(const std::vector<char> &inVec, const int start, co
     bool found_msp = false;
     int start_msp = 0;
     int end_msp = 0;
-    while(find_first_msp(cut_vec, start_msp, end_msp)) {
-        if(!found_msp) {
+    if(find_first_msp(cut_vec, start_msp, end_msp)) {
             msp_vec.insert(msp_vec.begin(), cut_vec.begin()+start_msp+1, cut_vec.begin()+end_msp);
             cut_vec.erase(cut_vec.begin()+start_msp+1, cut_vec.begin()+end_msp);
             found_msp = true;
-        }
     }
 
     // Echo the cut vector
@@ -245,17 +248,22 @@ void Conductor::parse_packet(const std::vector<char> &inVec, const int start, co
         // s += '\r\n';
         // esp_port->async_write_some( boost::asio::buffer(s), boost::bind(&Conductor::serial_write_handler, this, boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred) );
 
-        if (j_doc["dst"] != "jv") {return;}
+        if (j_doc["dst"] != "jv") {
+            pub_log_check("Incorrect json dest", ERROR, true);
+            return;
+        }
 
         if(j_doc["snd"] == "esp") {
 
             if(j_doc["typ"] == "alt") {
                 parse_altitude(j_doc["alt"]);
+                pub_log_check("Altitude received", DEBUG, true);
             }
             
             else if(j_doc["typ"] == "msp") {
                 // Need to search for the msp bytes
                 // parse_msp(std::vector<char> msp_vec);
+                pub_log_check("MSP received", DEBUG, true);
             }
 
         }
@@ -263,10 +271,12 @@ void Conductor::parse_packet(const std::vector<char> &inVec, const int start, co
         else if (j_doc["snd"] == "pc") {
 
             if(j_doc["typ"] == "mode") {
+                pub_log_check("Mode received", DEBUG, true);
                 parse_mode(j_doc);
             }
 
             else if(j_doc["typ"] == "land") {
+                pub_log_check("Landing received", DEBUG, true);
                 parse_landing(j_doc);
             }
 
@@ -284,6 +294,9 @@ void Conductor::serial_write_handler(const boost::system::error_code& error, std
     if(!error)
     {
 
+    }
+    else {
+        pub_log_check("Serial write error", ERROR, true);
     }
 }
 
@@ -315,6 +328,10 @@ void Conductor::parse_altitude(const json &alt_obj)
         }
 
     }
+    else 
+    {
+        pub_log_check("Invalid alt packet", ERROR, true);
+    }
 
 }
 
@@ -333,11 +350,11 @@ int Conductor::value_to_tx_range(double value)
 {
     if (value > MAX_CHANNEL_VALUE) {
         value = MAX_CHANNEL_VALUE;
-        std::cout << "[warn] channel value out of range (greater)" << std::endl;
+        pub_log_check("channel value out of range (greater)", WARN, true);
     }
     else if (value < MIN_CHANNEL_VALUE) {
         value = MIN_CHANNEL_VALUE;
-        std::cout << "[warn] channel value out of range (lower)" << std::endl;
+        pub_log_check("channel value out of range (lower)", WARN, true);
     }
 
     return round(value*6 + 1500); // Scaled from (-100, 100) to (900, 2100)
@@ -363,15 +380,18 @@ void Conductor::parse_mode(const json &mode_obj)
 {
     if(mode_obj["mode"] == "start") {
         set_controller_activity(true);
+        pub_log_check("Controller started", INFO, true);
     }
     else if(mode_obj["mode"] == "stop") {
         set_controller_activity(false);
+        pub_log_check("Controller stopped", INFO, true);
     }
     else if(mode_obj["mode"] == "quit") {
         set_controller_activity(false);
+        pub_log_check("Quit", INFO, true); // Might not send
+        send_timer->cancel();
         esp_port->cancel();
         esp_port->close();
-        send_timer->cancel();
     }
 
     if(mode_obj["rsp"] == "true") {
@@ -384,9 +404,11 @@ void Conductor::parse_landing(const json &land_obj)
 {
     if(land_obj["land"] == "true") {
         set_landing(true);
+        pub_log_check("Landing started", INFO, true);
     }
     else if(land_obj["land"] == "false") {
         set_landing(false);
+        pub_log_check("Landing stopped", INFO, true);
     }
 
     if(land_obj["rsp"] == "true") {
@@ -549,6 +571,44 @@ void Conductor::send_channels(const std::array<double, 16> &channels, const bool
 
     // Write to serial
     esp_port->async_write_some( boost::asio::buffer(all_data), boost::bind(&Conductor::serial_write_handler, this, boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred) );
+
+}
+
+
+
+void Conductor::pub_log_check(const std::string &in_str, int log_level, bool send)
+{
+    if(log_level >= GLOBAL_LOG_LEVEL) {
+        std::string lvl_str = "[]";
+        if(log_level == ALL) { lvl_str = "[ALL] "; }
+            else if(log_level == DEBUG) { lvl_str = "[DEBUG] "; }
+            else if(log_level == INFO) { lvl_str = "[INFO] "; }
+            else if(log_level == WARN) { lvl_str = "[WARN] "; }
+            else if(log_level == ERROR) { lvl_str = "[ERROR] "; }
+            else if(log_level == FATAL) { lvl_str = "[FATAL] "; }
+            else if(log_level == OFF) { lvl_str = "[OFF] "; }
+
+        if(file_log.is_open())
+            file_log << lvl_str << in_str << std::endl;
+        if(send)
+            end_log(in_str, log_level);
+    }
+}
+
+void Conductor::send_log(const std::string &in_str, int log_level)
+{
+    
+    json send_doc;
+    send_doc["snd"] = "jv";
+    send_doc["dst"] = "pc";
+    send_doc["typ"] = "log";
+    sender_doc["lvl"] = log_level;
+    send_doc["log"] = in_str;
+
+    // Echo the json packet
+    std::string s = send_doc.dump();
+    s += "\r\n";
+    esp_port->async_write_some( boost::asio::buffer(s), boost::bind(&Conductor::serial_write_handler, this, boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred) );
 
 }
 

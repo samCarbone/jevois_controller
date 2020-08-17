@@ -22,6 +22,10 @@
 
 using json = nlohmann::json;
 
+enum log_levels { ALL, DEBUG, INFO, WARN, ERROR, FATAL, OFF };
+
+const int GLOBAL_LOG_LEVEL = INFO;
+
 class Conductor
 {
 
@@ -79,6 +83,8 @@ private:
     void parse_altitude(const json &alt_obj);
     void send_mode(const bool active);
     void send_landing(const bool active);
+    void pub_log_check(const std::string &in_str, int log_level, bool send);
+    void send_log(const std::string &in_str, int log_level);
 
     // Control system
     AltitudeController* alt_controller;
@@ -99,7 +105,7 @@ private:
     std::string file_directory = ".";
     // Logging messages
     std::ofstream file_log;
-    std::string header_log = "*****************************************";
+    std::string header_log = "********************* LOG *********************";
     std::string prefix_log = "log_";
     // control signals
     std::ofstream file_sig;
