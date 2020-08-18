@@ -280,7 +280,7 @@ void Conductor::parse_packet(const std::vector<char> &inVec, const int start, co
                 parse_landing(j_doc);
             }
 
-            else if(mode_obj["mode"] == "quit") {
+            else if(j_doc["mode"] == "quit") {
                 set_controller_activity(false);
                 pub_log_check("Quit", INFO, true); // Might not send
                 send_timer->cancel();
