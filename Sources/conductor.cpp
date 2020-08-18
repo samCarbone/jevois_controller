@@ -37,7 +37,7 @@ Conductor::Conductor(std::string serial_port_name)
 
     // Open files - allow for immediate recording
     set_file_suffix("jv");
-    set_file_directory("./logs");
+    set_file_directory("/jevois/scripts");
     open_files();
 
     pub_log_check("Started", INFO, true);
@@ -280,6 +280,14 @@ void Conductor::parse_packet(const std::vector<char> &inVec, const int start, co
                 parse_landing(j_doc);
             }
 
+            else if(mode_obj["mode"] == "quit") {
+                set_controller_activity(false);
+                pub_log_check("Quit", INFO, true); // Might not send
+                send_timer->cancel();
+                esp_port->cancel();
+                esp_port->close();
+            }
+
         }
     }
     catch(const std::exception& e) {
@@ -378,20 +386,13 @@ double Conductor::saturate(double channel_value)
 
 void Conductor::parse_mode(const json &mode_obj)
 {
-    if(mode_obj["mode"] == "start") {
+    if(mode_obj["mode"] == 1) { // TODO: change to enum
         set_controller_activity(true);
         pub_log_check("Controller started", INFO, true);
     }
-    else if(mode_obj["mode"] == "stop") {
+    else if(mode_obj["mode"] == 2) { // TODO: change to enum
         set_controller_activity(false);
         pub_log_check("Controller stopped", INFO, true);
-    }
-    else if(mode_obj["mode"] == "quit") {
-        set_controller_activity(false);
-        pub_log_check("Quit", INFO, true); // Might not send
-        send_timer->cancel();
-        esp_port->cancel();
-        esp_port->close();
     }
 
     if(mode_obj["rsp"] == "true") {
@@ -402,11 +403,11 @@ void Conductor::parse_mode(const json &mode_obj)
 
 void Conductor::parse_landing(const json &land_obj)
 {
-    if(land_obj["land"] == "true") {
+    if(land_obj["land"] == 1) { // TODO: change to enum
         set_landing(true);
         pub_log_check("Landing started", INFO, true);
     }
-    else if(land_obj["land"] == "false") {
+    else if(land_obj["land"] == 2) { // TODO: change to enum
         set_landing(false);
         pub_log_check("Landing stopped", INFO, true);
     }
@@ -445,7 +446,8 @@ void Conductor::send_mode(const bool active)
     json send_doc;
     send_doc["snd"] = "jv";
     send_doc["dst"] = "pc";
-    send_doc["mode"] = active ? "true" : "false";
+    send_doc["typ"] = "mode";
+    send_doc["mode"] = active ? 1 : 2; // TODO: change to enum
 
     // Echo the json packet
     std::string s = send_doc.dump();
@@ -459,7 +461,8 @@ void Conductor::send_landing(const bool active)
     json send_doc;
     send_doc["snd"] = "jv";
     send_doc["dst"] = "pc";
-    send_doc["land"] = active ? "true" : "false";
+    send_doc["typ"] = "land";
+    send_doc["land"] = active ? 1 : 2; // TODO: change to enum
 
     // Echo the json packet
     std::string s = send_doc.dump();
@@ -485,10 +488,15 @@ void Conductor::timer_handler(const boost::system::error_code& error)
     // Restart the timer
     send_timer->async_wait(boost::bind(&Conductor::timer_handler, this, boost::asio::placeholders::error));
 
-    pub_log_check("Send timer done", INFO, true);
 
     if(!error)
     {
+
+        if(!sent_initial) {
+            send_mode(controller_activity);
+            send_landing(landing);
+            sent_initial = true;
+        }
 
         if(controller_activity && alt_controller->isValidState()) {
 

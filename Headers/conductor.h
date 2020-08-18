@@ -65,6 +65,7 @@ private:
     bool get_controller_activity();
     bool landing = false;
     void set_landing(bool is_landing);
+    bool sent_initial = false;
 
     // Send Timer
     std::chrono::steady_clock::time_point start_time_jv;
