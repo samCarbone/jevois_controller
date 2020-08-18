@@ -17,10 +17,11 @@ set(CMAKE_CXX_COMPILER "/usr/share/jevois-sdk/out/sun8iw5p1/linux/common/buildro
 
 set(JEVOIS_PLATFORM_ARCH_FLAGS "-mcpu=cortex-a7 -mfpu=neon-vfpv4 -mfloat-abi=hard -ftree-vectorize -Ofast -funsafe-math-optimizations -mfp16-format=ieee")
 
-set(JEVOIS_PLATFORM_CFLAGS "-W -Wall -Wextra -g -O4 -I/usr/share/jevois-sdk/out/sun8iw5p1/linux/common/buildroot/build/linux-headers-3.4.113/usr/include -fPIC -Wno-deprecated-declarations -Wno-psabi") #-I/jevois/include 
+set(JEVOIS_PLATFORM_CFLAGS " -g -O4 -I/usr/share/jevois-sdk/out/sun8iw5p1/linux/common/buildroot/build/linux-headers-3.4.113/usr/include -fPIC -Wno-deprecated-declarations") #-I/jevois/include 
+# -W -Wall -Wextra -Wno-psabi
 
-set(CMAKE_C_FLAGS "-std=gnu99 ${JEVOIS_PLATFORM_ARCH_FLAGS} ${JEVOIS_PLATFORM_CFLAGS}")
-set(CMAKE_CXX_FLAGS "${JEVOIS_PLATFORM_ARCH_FLAGS} ${JEVOIS_PLATFORM_CFLAGS}")
+set(CMAKE_C_FLAGS "-std=gnu99 -W -Wno-psabi -Wno-attribute-warning ${JEVOIS_PLATFORM_ARCH_FLAGS} ${JEVOIS_PLATFORM_CFLAGS}")
+set(CMAKE_CXX_FLAGS " -W -Wno-psabi -Wno-attribute-warning ${JEVOIS_PLATFORM_ARCH_FLAGS} ${JEVOIS_PLATFORM_CFLAGS}")
 
 # specify the C++ standard
 set(CMAKE_CXX_STANDARD 17)

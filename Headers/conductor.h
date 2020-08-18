@@ -87,6 +87,12 @@ private:
     void pub_log_check(const std::string &in_str, int log_level, bool send);
     void send_log(const std::string &in_str, int log_level);
 
+    static bool find_json_start(std::vector<char> &data, int search_start, int &start);
+    static bool find_json_end(std::vector<char> &data, int search_start, int &end);
+    bool found_start = false;
+    size_t SRC_MAX_LEN = 512; // Maximum length of serial read concat
+
+
     // Control system
     AltitudeController* alt_controller;
     AltitudeEstimator* alt_estimator;

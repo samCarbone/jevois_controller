@@ -65,6 +65,32 @@ Conductor::~Conductor()
 //
 // **********************************************************
 
+bool Conductor::find_json_start(std::vector<char> &data, int search_start, int &start)
+{
+    start = search_start;
+    for(int i=search_start; i<data.size(); i++) {
+        if(data.at(i) == '{') {
+            start = i;
+            return true;
+        }
+    }
+    return false;
+}
+
+
+bool Conductor::find_json_end(std::vector<char> &data, int search_start, int &end)
+{
+    const std::vector<char> END_SEQ = {'}', '\r', '\n'};
+    end = search_start;
+    for(int i=search_start; i<data.size()-END_SEQ.size()+1; i++) {
+        if(std::equal(data.begin()+i, data.begin()+i+END_SEQ.size(), END_SEQ.begin(), END_SEQ.end())) {
+            end = i;
+            return true;
+        }
+    }
+    return false;
+}
+
 void Conductor::serial_read_handler(const boost::system::error_code& error, std::size_t bytes_transferred)
 {
     if(!error)
@@ -73,20 +99,75 @@ void Conductor::serial_read_handler(const boost::system::error_code& error, std:
         // Echo data back
         // serial_write_buffer = serial_read_buffer;
 	    // esp_port->async_write_some( boost::asio::buffer(serial_write_buffer, bytes_transferred), boost::bind(&Conductor::serial_write_handler, this, boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred) );
-        serial_read_concat.insert(serial_read_concat.end(), serial_read_buffer.begin(), serial_read_buffer.begin()+bytes_transferred);
+        // serial_read_concat.insert(serial_read_concat.end(), serial_read_buffer.begin(), serial_read_buffer.begin()+bytes_transferred);
+        
+        // TODO: look at eliminating this copy
+        std::vector<char> payload(serial_read_buffer.begin(), serial_read_buffer.begin()+bytes_transferred);
 
-        int start, end;
-        while(find_first_json(serial_read_concat, start, end)) {
-            // Include the first character of the delimiter (i.e. the '}' of "}\r\n")
-            end++;
-
-            // Parse it
-            parse_packet(serial_read_concat, start, end);
+        bool finished = false; // Done processing this current payload
+        int start = 0;
+        int search_begin_idx = 0;
+        while(!finished) {
             
-            // Now erase this json packet from serial_read_concat
-            // Erase elements prior to this json packet
-            serial_read_concat.erase(serial_read_concat.begin(), serial_read_concat.begin()+end+2); // removes the \r\n as well
+            if(!found_start) {
+                // Find start
+                if(find_json_start(payload, search_begin_idx, start)) {
+                    serial_read_concat.clear();
+                    found_start = true;
+                }
+                else {
+                    finished = true;
+                }
+            }
+
+            if(found_start) {
+                int end = 0;
+                if(find_json_end(payload, /*search start*/ start+1, /*found end*/ end)) {
+                    serial_read_concat.insert(serial_read_concat.end(), payload.begin()+start, payload.begin()+end+1);
+                    // Parse it
+                    // [start, end)
+                    parse_packet(serial_read_concat, 0, serial_read_concat.size());
+                    //
+                    search_begin_idx = end+3;
+                    found_start = false;
+                }
+                else {
+
+                    // Limit max size of serial_read_concat during successive payload receives without an end found
+                    // It is possible for serial_read_concat to exceed this size if the end was found within the payload
+                    if(serial_read_concat.size()+(payload.size()- start) > SRC_MAX_LEN) {
+                        // Disregard this payload and reset
+                        found_start = false;
+                    }
+                    else {
+                        serial_read_concat.insert(serial_read_concat.end(), payload.begin()+start, payload.end());
+                    }
+                    finished = true;
+                }
+            }
+            else {
+                finished = true;
+            }
+
         }
+
+
+
+
+
+
+        // int start, end;
+        // while(find_first_json(serial_read_concat, start, end)) {
+        //     // Include the first character of the delimiter (i.e. the '}' of "}\r\n")
+        //     end++;
+
+        //     // Parse it
+        //     parse_packet(serial_read_concat, start, end);
+            
+        //     // Now erase this json packet from serial_read_concat
+        //     // Erase elements prior to this json packet
+        //     serial_read_concat.erase(serial_read_concat.begin(), serial_read_concat.begin()+end+2); // removes the \r\n as well
+        // }
 
 
     }
@@ -133,6 +214,7 @@ bool Conductor::find_first_json(const std::vector<char> &inVec, int &start, int 
 
 }
 
+// [start, end] --> [", "]
 bool Conductor::find_first_msp(const std::vector<char> &inVec, int &start, int &end)
 {
 
@@ -180,25 +262,14 @@ bool Conductor::find_first_msp(const std::vector<char> &inVec, int &start, int &
 
     }
 
-    if(found_start) {
+    if(found_start && expected_end < inVec.size()-1) {
 
-        // Find the end. Note: this will find a closing quotation mark of
-        // another element if it is missing for the msp message.
-        // this means that the end position is >= real msp end
-        for(int i=expected_end; i<inVec.size()-1; i++) {
-            bool found_end = false;
+        if(inVec.at(expected_end) != chr_3)
+            return false;
 
-            if(inVec.at(i) != chr_3)
-                continue;
-
-            for(auto &opt: chrs_option_4) {
-                if(inVec.at(i+1) == opt) {
-                    found_end = true;
-                    break;
-                }
-            }
-            if(found_end) {
-                end = i;
+        for(auto &opt: chrs_option_4) {
+            if(inVec.at(expected_end+1) == opt) {
+                end = expected_end;
                 return true;
             }
         }
@@ -209,15 +280,15 @@ bool Conductor::find_first_msp(const std::vector<char> &inVec, int &start, int &
 
 }
 
+// [start, end)
 void Conductor::parse_packet(const std::vector<char> &inVec, const int start, const int end)
 {
-    // Could copy into a new vector for convenience
+    // Copy into a new vector --> not ideal if not necessary
     std::vector<char> cut_vec(inVec.begin()+start, inVec.begin()+end);
-    for (int i=0; i<cut_vec.size(); i++) {
-        if(cut_vec.at(i) <= 31) {
-            cut_vec.at(i) = 'x';
-        }
-    }
+    
+    
+    
+
 
     /* Note: this does not support multiple msp messages
     within a single json packet. It will use the first msp message.
@@ -228,9 +299,18 @@ void Conductor::parse_packet(const std::vector<char> &inVec, const int start, co
     int start_msp = 0;
     int end_msp = 0;
     if(find_first_msp(cut_vec, start_msp, end_msp)) {
-            msp_vec.insert(msp_vec.begin(), cut_vec.begin()+start_msp+1, cut_vec.begin()+end_msp);
-            cut_vec.erase(cut_vec.begin()+start_msp+1, cut_vec.begin()+end_msp);
-            found_msp = true;
+        // copy and erase between the " "
+        msp_vec.insert(msp_vec.begin(), cut_vec.begin()+start_msp+1, cut_vec.begin()+end_msp);
+        cut_vec.erase(cut_vec.begin()+start_msp+1, cut_vec.begin()+end_msp);
+        found_msp = true;
+    }
+    else {
+        // Safe any bytes outside acceptable range
+        for (int i=0; i<cut_vec.size(); i++) {
+            if(cut_vec.at(i) <= 31) {
+                cut_vec.at(i) = '#';
+            }
+        }
     }
 
     // Echo the cut vector
