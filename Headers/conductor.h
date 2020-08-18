@@ -24,7 +24,7 @@ using json = nlohmann::json;
 
 enum log_levels { ALL, DEBUG, INFO, WARN, ERROR, FATAL, OFF };
 
-const int GLOBAL_LOG_LEVEL = DEBUG;
+const int GLOBAL_LOG_LEVEL = INFO;
 
 class Conductor
 {
@@ -46,8 +46,8 @@ private:
 
     void sendTimerDone();
 
-    const int SEND_CONTROL_PERIOD_MS = 500; // ms, time between sending control commansd
-    const int PROP_TIMEOUT = 100;
+    const int SEND_CONTROL_PERIOD_MS = 1000; // ms, time between sending control commansd
+    const int PROP_LIMIT = 100;
 
 
     // Channels

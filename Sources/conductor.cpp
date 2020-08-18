@@ -253,6 +253,8 @@ void Conductor::parse_packet(const std::vector<char> &inVec, const int start, co
             return;
         }
 
+        pub_log_check("JSON received", DEBUG, true);
+
         if(j_doc["snd"] == "esp") {
 
             if(j_doc["typ"] == "alt") {
@@ -291,6 +293,7 @@ void Conductor::parse_packet(const std::vector<char> &inVec, const int start, co
         }
     }
     catch(const std::exception& e) {
+        pub_log_check("JSON parse error", ERROR, true);
         std::cerr << e.what() << std::endl;    
     }
 
@@ -386,11 +389,11 @@ double Conductor::saturate(double channel_value)
 
 void Conductor::parse_mode(const json &mode_obj)
 {
-    if(mode_obj["mode"] == 1) { // TODO: change to enum
+    if(mode_obj["mode"].get<int>() == 1) { // TODO: change to enum
         set_controller_activity(true);
         pub_log_check("Controller started", INFO, true);
     }
-    else if(mode_obj["mode"] == 2) { // TODO: change to enum
+    else if(mode_obj["mode"].get<int>() == 2) { // TODO: change to enum
         set_controller_activity(false);
         pub_log_check("Controller stopped", INFO, true);
     }
@@ -403,11 +406,11 @@ void Conductor::parse_mode(const json &mode_obj)
 
 void Conductor::parse_landing(const json &land_obj)
 {
-    if(land_obj["land"] == 1) { // TODO: change to enum
+    if(land_obj["land"].get<int>() == 1) { // TODO: change to enum
         set_landing(true);
         pub_log_check("Landing started", INFO, true);
     }
-    else if(land_obj["land"] == 2) { // TODO: change to enum
+    else if(land_obj["land"].get<int>() == 2) { // TODO: change to enum
         set_landing(false);
         pub_log_check("Landing stopped", INFO, true);
     }
@@ -492,6 +495,8 @@ void Conductor::timer_handler(const boost::system::error_code& error)
     if(!error)
     {
 
+        pub_log_check("Send timer", DEBUG, true);
+
         if(!sent_initial) {
             send_mode(controller_activity);
             send_landing(landing);
@@ -509,7 +514,7 @@ void Conductor::timer_handler(const boost::system::error_code& error)
             }
 
             double chn_thr, chn_ele, chn_ail, chn_rud;
-            AltState_t prop_alt_state = alt_estimator->getPropagatedStateEstimate_safe(time_elapsed_ms(), PROP_TIMEOUT);
+            AltState_t prop_alt_state = alt_estimator->getPropagatedStateEstimate_safe(time_elapsed_ms(), PROP_LIMIT);
             chn_thr = saturate(alt_controller->getControlTempState(prop_alt_state));
             // TODO: find a way to not set the arm channel
             std::array<double, 16> mixed_channels = {0, 0, chn_thr, 0, 100, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
