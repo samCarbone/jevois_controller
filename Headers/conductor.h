@@ -24,7 +24,7 @@ using json = nlohmann::json;
 
 enum log_levels { ALL, DEBUG, INFO, WARN, ERROR, FATAL, OFF };
 
-const int GLOBAL_LOG_LEVEL = INFO;
+const int GLOBAL_LOG_LEVEL = DEBUG;
 
 class Conductor
 {
@@ -46,7 +46,7 @@ private:
 
     void sendTimerDone();
 
-    const int SEND_CONTROL_PERIOD_MS = 50; // ms, time between sending control commansd
+    const int SEND_CONTROL_PERIOD_MS = 500; // ms, time between sending control commansd
     const int PROP_TIMEOUT = 100;
 
 
@@ -69,7 +69,7 @@ private:
     // Send Timer
     std::chrono::steady_clock::time_point start_time_jv;
     boost::asio::high_resolution_timer* send_timer;
-    const long CONTROL_LOOP_PERIOD_MS = 50; // ms
+    const long CONTROL_LOOP_PERIOD_MS = 500; // ms
     void timer_handler(const boost::system::error_code& error);
     int time_elapsed_ms();
 

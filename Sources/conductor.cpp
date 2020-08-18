@@ -14,7 +14,7 @@ Conductor::Conductor(std::string serial_port_name)
 
     // Construct and open the serial port
     esp_port = new boost::asio::serial_port(io, serial_port_name);
-    esp_port->set_option(boost::asio::serial_port_base::baud_rate(115200));
+    esp_port->set_option(boost::asio::serial_port_base::baud_rate(57600));
     esp_port->set_option(boost::asio::serial_port_base::flow_control(boost::asio::serial_port_base::flow_control::none));
     esp_port->set_option(boost::asio::serial_port_base::character_size(8));
     esp_port->set_option(boost::asio::serial_port_base::parity(boost::asio::serial_port_base::parity::none));
@@ -485,6 +485,8 @@ void Conductor::timer_handler(const boost::system::error_code& error)
     // Restart the timer
     send_timer->async_wait(boost::bind(&Conductor::timer_handler, this, boost::asio::placeholders::error));
 
+    pub_log_check("Send timer done", INFO, true);
+
     if(!error)
     {
 
@@ -591,7 +593,7 @@ void Conductor::pub_log_check(const std::string &in_str, int log_level, bool sen
         if(file_log.is_open())
             file_log << lvl_str << in_str << std::endl;
         if(send)
-            end_log(in_str, log_level);
+            send_log(in_str, log_level);
     }
 }
 
@@ -602,7 +604,7 @@ void Conductor::send_log(const std::string &in_str, int log_level)
     send_doc["snd"] = "jv";
     send_doc["dst"] = "pc";
     send_doc["typ"] = "log";
-    sender_doc["lvl"] = log_level;
+    send_doc["lvl"] = log_level;
     send_doc["log"] = in_str;
 
     // Echo the json packet
