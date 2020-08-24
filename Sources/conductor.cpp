@@ -37,7 +37,7 @@ Conductor::Conductor(std::string serial_port_name)
 
     // Open files - allow for immediate recording
     set_file_suffix("jv");
-    set_file_directory("/jevois/scripts");
+    set_file_directory("/jevois/scripts/logs");
     open_files();
 
     pub_log_check("Started", INFO, true);
@@ -65,6 +65,7 @@ Conductor::~Conductor()
 //
 // **********************************************************
 
+// [{, }]
 bool Conductor::find_json_start(std::vector<char> &data, int search_start, int &start)
 {
     start = search_start;
@@ -78,11 +79,38 @@ bool Conductor::find_json_start(std::vector<char> &data, int search_start, int &
 }
 
 
-bool Conductor::find_json_end(std::vector<char> &data, int search_start, int &end)
+bool Conductor::find_json_overlap(std::vector<char> &prev_data, std::vector<char> &data, int &end_delta)
+{
+
+    const std::vector<char> END_SEQ = {'}', '\r', '\n'};
+
+    // Not the neatest solution, but hard-coded check the two overlap cases
+    if(prev_data.size() >= 2 && (int)data.size() >= 1) {
+        if(prev_data.at(prev_data.size()-2) == END_SEQ.at(0) && prev_data.at(prev_data.size()-1) == END_SEQ.at(1) && data.at(0) == END_SEQ.at(2))
+        { 
+            end_delta = -2;
+            return true; 
+        }
+    }
+    
+    if(prev_data.size() >= 1 && (int)data.size() >= 2) {
+        if(prev_data.back() == END_SEQ.at(0) && data.at(0) == END_SEQ.at(1) && data.at(1) == END_SEQ.at(2)) 
+        {
+            end_delta = -1;
+            return true; 
+        }
+    }
+
+    return false;
+
+}
+
+// [{, }]
+bool Conductor::find_json_end(std::vector<char> &prev_data, std::vector<char> &data, int search_start, int &end)
 {
     const std::vector<char> END_SEQ = {'}', '\r', '\n'};
     end = search_start;
-    for(int i=search_start; i<data.size()-END_SEQ.size()+1; i++) {
+    for(int i=search_start; i<(int)data.size()-(int)END_SEQ.size()+1; i++) {
         if(std::equal(data.begin()+i, data.begin()+i+END_SEQ.size(), END_SEQ.begin(), END_SEQ.end())) {
             end = i;
             return true;
@@ -95,12 +123,7 @@ void Conductor::serial_read_handler(const boost::system::error_code& error, std:
 {
     if(!error)
     {
-        // Serial data available
-        // Echo data back
-        // serial_write_buffer = serial_read_buffer;
-	    // esp_port->async_write_some( boost::asio::buffer(serial_write_buffer, bytes_transferred), boost::bind(&Conductor::serial_write_handler, this, boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred) );
-        // serial_read_concat.insert(serial_read_concat.end(), serial_read_buffer.begin(), serial_read_buffer.begin()+bytes_transferred);
-        
+
         // TODO: look at eliminating this copy
         std::vector<char> payload(serial_read_buffer.begin(), serial_read_buffer.begin()+bytes_transferred);
 
@@ -109,6 +132,7 @@ void Conductor::serial_read_handler(const boost::system::error_code& error, std:
         int search_begin_idx = 0;
         while(!finished) {
             
+            // try {
             if(!found_start) {
                 // Find start
                 if(find_json_start(payload, search_begin_idx, start)) {
@@ -121,28 +145,39 @@ void Conductor::serial_read_handler(const boost::system::error_code& error, std:
             }
 
             if(found_start) {
+                
                 int end = 0;
-                if(find_json_end(payload, /*search start*/ start+1, /*found end*/ end)) {
-                    serial_read_concat.insert(serial_read_concat.end(), payload.begin()+start, payload.begin()+end+1);
-                    // Parse it
-                    // [start, end)
+                int end_delta = 0;
+                if(start == 0 && find_json_overlap(serial_read_concat, payload, end_delta)) {
+                    // at the end ---> -1, second last --> -2
+                    search_begin_idx = 2;
+                    if(end_delta == -2) {
+                        serial_read_concat.erase(serial_read_concat.end()-1, serial_read_concat.end());
+                        search_begin_idx = 1;
+                    }
                     parse_packet(serial_read_concat, 0, serial_read_concat.size());
-                    //
+                    found_start = false;
+                }
+
+                else if(find_json_end(serial_read_concat, payload, start, end)) {
+                    serial_read_concat.insert(serial_read_concat.end(), payload.begin()+start, payload.begin()+end+1);
+                    parse_packet(serial_read_concat, 0, serial_read_concat.size());
                     search_begin_idx = end+3;
                     found_start = false;
                 }
+
                 else {
 
-                    // Limit max size of serial_read_concat during successive payload receives without an end found
-                    // It is possible for serial_read_concat to exceed this size if the end was found within the payload
-                    if(serial_read_concat.size()+(payload.size()- start) > SRC_MAX_LEN) {
+                    if((int)serial_read_concat.size()+((int)payload.size()- start) > SRC_MAX_LEN) {
                         // Disregard this payload and reset
                         found_start = false;
                     }
                     else {
                         serial_read_concat.insert(serial_read_concat.end(), payload.begin()+start, payload.end());
+                                        
                     }
                     finished = true;
+
                 }
             }
             else {
@@ -150,25 +185,6 @@ void Conductor::serial_read_handler(const boost::system::error_code& error, std:
             }
 
         }
-
-
-
-
-
-
-        // int start, end;
-        // while(find_first_json(serial_read_concat, start, end)) {
-        //     // Include the first character of the delimiter (i.e. the '}' of "}\r\n")
-        //     end++;
-
-        //     // Parse it
-        //     parse_packet(serial_read_concat, start, end);
-            
-        //     // Now erase this json packet from serial_read_concat
-        //     // Erase elements prior to this json packet
-        //     serial_read_concat.erase(serial_read_concat.begin(), serial_read_concat.begin()+end+2); // removes the \r\n as well
-        // }
-
 
     }
     else {
@@ -179,40 +195,38 @@ void Conductor::serial_read_handler(const boost::system::error_code& error, std:
 
 }
 
-bool Conductor::find_first_json(const std::vector<char> &inVec, int &start, int &end)
-{
+// bool Conductor::find_first_json(const std::vector<char> &inVec, int &start, int &end)
+// {
 
-    bool found_start = false;
-    start = 0;
-    end = 0;
-    std::array<char, 3> DELIM = {'}', '\r', '\n'};
-    // Search for the start
-    for(int i=0; i<inVec.size()-DELIM.size(); i++) {
-        if(inVec.at(i) == '{') {
-            start = i;
-            found_start = true;
-            break;
-        }
-    }
+//     bool found_start = false;
+//     start = 0;
+//     end = 0;
+//     std::array<char, 3> DELIM = {'}', '\r', '\n'};
+//     // Search for the start
+//     for(int i=0; i<inVec.size()-DELIM.size(); i++) {
+//         if(inVec.at(i) == '{') {
+//             start = i;
+//             found_start = true;
+//             break;
+//         }
+//     }
 
-    if(found_start) {
-        // Search for the end
-        for(int i=start+1; i<inVec.size()-DELIM.size()+1; i++) {
-            bool is_end = true;
-            for(int j=0; j<DELIM.size()&&is_end; j++) {
-                is_end &= inVec.at(i+j) == DELIM.at(j);
-            }
-            if(is_end) {
-                end = i;
-                return true;
-            }
-        }
-    }
-    
+//     if(found_start) {
+//         // Search for the end
+//         for(int i=start+1; i<inVec.size()-DELIM.size()+1; i++) {
+//             bool is_end = true;
+//             for(int j=0; j<DELIM.size()&&is_end; j++) {
+//                 is_end &= inVec.at(i+j) == DELIM.at(j);
+//             }
+//             if(is_end) {
+//                 end = i;
+//                 return true;
+//             }
+//         }
+//     } 
+//     return false;    
+// }
 
-    return false;    
-
-}
 
 // [start, end] --> [", "]
 bool Conductor::find_first_msp(const std::vector<char> &inVec, int &start, int &end)
@@ -229,7 +243,7 @@ bool Conductor::find_first_msp(const std::vector<char> &inVec, int &start, int &
     const int min_msp_len = 6;
 
     // Find the start
-    for(int i=0; i<inVec.size()-chrs_2.size()-2-min_msp_len; i++) {
+    for(int i=0; i<(int)inVec.size()-(int)chrs_2.size()-2-min_msp_len; i++) {
 
         // Check for the first character
         // one OR the other
@@ -262,7 +276,7 @@ bool Conductor::find_first_msp(const std::vector<char> &inVec, int &start, int &
 
     }
 
-    if(found_start && expected_end < inVec.size()-1) {
+    if(found_start && expected_end < (int)inVec.size()-1) {
 
         if(inVec.at(expected_end) != chr_3)
             return false;
@@ -285,15 +299,12 @@ void Conductor::parse_packet(const std::vector<char> &inVec, const int start, co
 {
     // Copy into a new vector --> not ideal if not necessary
     std::vector<char> cut_vec(inVec.begin()+start, inVec.begin()+end);
-    
-    
-    
-
 
     /* Note: this does not support multiple msp messages
     within a single json packet. It will use the first msp message.
     */
     // MSP search ({,)"msp":"*"(,})
+    // try {
     std::vector<char> msp_vec;
     bool found_msp = false;
     int start_msp = 0;
@@ -302,80 +313,90 @@ void Conductor::parse_packet(const std::vector<char> &inVec, const int start, co
         // copy and erase between the " "
         msp_vec.insert(msp_vec.begin(), cut_vec.begin()+start_msp+1, cut_vec.begin()+end_msp);
         cut_vec.erase(cut_vec.begin()+start_msp+1, cut_vec.begin()+end_msp);
+
         found_msp = true;
     }
     else {
         // Safe any bytes outside acceptable range
         for (int i=0; i<cut_vec.size(); i++) {
             if(cut_vec.at(i) <= 31) {
-                cut_vec.at(i) = '#';
+                if(cut_vec.at(i) == '\r') {cut_vec.at(i) = 'r';}
+                else if(cut_vec.at(i) == '\n') {cut_vec.at(i) = 'n';}
+                else {cut_vec.at(i) = '#';}
             }
         }
     }
+    // } catch (const std::exception& e) {
+    //     std::cerr << "[caught: find_first_msp] " << e.what() << std::endl;    
+    //     return;
+    // }
 
     // Echo the cut vector
     // esp_port->async_write_some( boost::asio::buffer(cut_vec), boost::bind(&Conductor::serial_write_handler, this, boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred) );
 
     // Catch all exceptions
     // We want to keep the program running and just ignore invalid json packets
+    
+    json j_doc;
     try {
-        json j_doc = json::parse(cut_vec);
-        if(j_doc.is_null())
-            return;
-
+        j_doc = json::parse(cut_vec);
+    } catch(const std::exception& e) {
+        pub_log_check("JSON parse error", ERROR, true);
+        std::cerr << "[caught] " << e.what() << std::endl;   
+        return; 
+    }
         // Echo the json packet
         // std::string s = j_doc.dump();
         // s += '\r\n';
         // esp_port->async_write_some( boost::asio::buffer(s), boost::bind(&Conductor::serial_write_handler, this, boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred) );
 
-        if (j_doc["dst"] != "jv") {
-            pub_log_check("Incorrect json dest", ERROR, true);
+    if(j_doc.is_null())
             return;
-        }
 
-        pub_log_check("JSON received", DEBUG, true);
-
-        if(j_doc["snd"] == "esp") {
-
-            if(j_doc["typ"] == "alt") {
-                parse_altitude(j_doc["alt"]);
-                pub_log_check("Altitude received", DEBUG, true);
-            }
-            
-            else if(j_doc["typ"] == "msp") {
-                // Need to search for the msp bytes
-                // parse_msp(std::vector<char> msp_vec);
-                pub_log_check("MSP received", DEBUG, true);
-            }
-
-        }
-
-        else if (j_doc["snd"] == "pc") {
-
-            if(j_doc["typ"] == "mode") {
-                pub_log_check("Mode received", DEBUG, true);
-                parse_mode(j_doc);
-            }
-
-            else if(j_doc["typ"] == "land") {
-                pub_log_check("Landing received", DEBUG, true);
-                parse_landing(j_doc);
-            }
-
-            else if(j_doc["typ"] == "quit") {
-                set_controller_activity(false);
-                pub_log_check("Quit", INFO, true); // Might not send
-                send_timer->cancel();
-                esp_port->cancel();
-                esp_port->close();
-            }
-
-        }
+    if (j_doc["dst"] != "jv") {
+        pub_log_check("Incorrect json dest", ERROR, true);
+        return;
     }
-    catch(const std::exception& e) {
-        pub_log_check("JSON parse error", ERROR, true);
-        std::cerr << e.what() << std::endl;    
+
+    pub_log_check("JSON received", DEBUG, true);
+
+    if(j_doc["snd"] == "esp") {
+
+        if(j_doc["typ"] == "alt") {
+            parse_altitude(j_doc["alt"]);
+            pub_log_check("Altitude received", DEBUG, true);
+        }
+        
+        else if(j_doc["typ"] == "msp") {
+            // Need to search for the msp bytes
+            // parse_msp(std::vector<char> msp_vec);
+            pub_log_check("MSP received", DEBUG, true);
+        }
+
     }
+
+    else if (j_doc["snd"] == "pc") {
+
+        if(j_doc["typ"] == "mode") {
+            pub_log_check("Mode received", DEBUG, true);
+            parse_mode(j_doc);
+        }
+
+        else if(j_doc["typ"] == "land") {
+            pub_log_check("Landing received", DEBUG, true);
+            parse_landing(j_doc);
+        }
+
+        else if(j_doc["typ"] == "quit") {
+            set_controller_activity(false);
+            pub_log_check("Quit", INFO, true); // Might not send
+            send_timer->cancel();
+            esp_port->cancel();
+            esp_port->close();
+        }
+
+    }
+
 
 }
 
@@ -589,6 +610,7 @@ void Conductor::timer_handler(const boost::system::error_code& error)
                 AltTarget_t targetTemp;
                 if(alt_controller->getTarget(targetTemp)) {
                     targetTemp.z += 0.1*((double)CONTROL_LOOP_PERIOD_MS)/1000.0; targetTemp.z_dot = 0.1;
+                    targetTemp.z = targetTemp.z > 0.0 ? targetTemp.z : 0.0;
                     alt_controller->setTarget(targetTemp);
                 }
             }
@@ -723,7 +745,7 @@ bool Conductor::open_files()
     }
 
     if(!file_sig.is_open()) {
-        std::string name_sig = file_directory + "/" + prefix_log + suffix + format;
+        std::string name_sig = file_directory + "/" + prefix_sig + suffix + format;
         file_sig.open(name_sig, std::ios::out | std::ios::app); // Append the file contents to prevent overwrite
     }
     
@@ -768,6 +790,7 @@ std::string Conductor::get_file_suffix()
 
 void Conductor::set_file_directory(std::string directory_in)
 {
+    file_directory = directory_in;
     alt_estimator->set_file_directory(directory_in);
     alt_controller->set_file_directory(directory_in);
 }

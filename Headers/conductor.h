@@ -70,13 +70,13 @@ private:
     // Send Timer
     std::chrono::steady_clock::time_point start_time_jv;
     boost::asio::high_resolution_timer* send_timer;
-    const long CONTROL_LOOP_PERIOD_MS = 500; // ms
+    const long CONTROL_LOOP_PERIOD_MS = 50; // ms
     void timer_handler(const boost::system::error_code& error);
     int time_elapsed_ms();
 
     // Comms
     void send_channels(const std::array<double, 16> &channels, const bool response=false);
-    bool find_first_json(const std::vector<char> &inVec, int &start, int &end);
+    // bool find_first_json(const std::vector<char> &inVec, int &start, int &end);
     bool find_first_msp(const std::vector<char> &inVec, int &start, int &end);
     void parse_packet(const std::vector<char> &inVec, const int start, const int end);
     void parse_mode(const json &mode_obj);
@@ -88,7 +88,9 @@ private:
     void send_log(const std::string &in_str, int log_level);
 
     static bool find_json_start(std::vector<char> &data, int search_start, int &start);
-    static bool find_json_end(std::vector<char> &data, int search_start, int &end);
+    static bool find_json_end(std::vector<char> &prev_data, std::vector<char> &data, int search_start, int &end);
+    static bool find_json_overlap(std::vector<char> &prev_data, std::vector<char> &data, int &end_delta);
+
     bool found_start = false;
     size_t SRC_MAX_LEN = 512; // Maximum length of serial read concat
 
