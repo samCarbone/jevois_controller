@@ -17,13 +17,14 @@ set(Boost_LIBRARIES, "usr/include/boost")
 INCLUDE_DIRECTORIES(${Boost_LIBRARIES})
 
 # include crc
-# INCLUDE_DIRECTORIES(${PROJECT_BINARY_DIR}/../CRCpp/inc)
+# INCLUDE_DIRECTORIES(${PROJECT_BINARY_DIR}/../CRCpp/inc/)
 # set(crc_directory, ${PROJECT_BINARY_DIR}/../CRCpp/inc)
 # INCLUDE_DIRECTORIES(${crc_directory})
-INCLUDE_DIRECTORIES(/Users/samuelcarbone/Documents/cpp-projects/jevois_controller/CRCpp/inc/)
+# INCLUDE_DIRECTORIES(/Users/samuelcarbone/Documents/cpp-projects/jevois_controller/CRCpp/inc/)
+INCLUDE_DIRECTORIES(~/Documents/cpp-playground/jevois_controller/CRCpp/inc/)
 
 # add the executable
-add_executable(Test Test.cpp)
+add_executable(Test test.cpp)
 
 # link boost library
 TARGET_LINK_LIBRARIES( Test  LINK_PUBLIC ${Boost_LIBRARIES} -lboost_system -lboost_regex -lboost_thread -lpthread -ltbb -ldl -lutil -lm)
