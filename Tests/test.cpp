@@ -9,7 +9,7 @@
 
 #include <string>
 
-#include "CRC.h"
+#include <CRC.h>
 
 #include <cstdint>
 

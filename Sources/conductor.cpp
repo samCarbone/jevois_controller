@@ -6,7 +6,7 @@
 
 Conductor::Conductor()
 {
-	Conductor("/dev/ttyS0");
+	Conductor("/dev/ttyS0", 57600);
 }
 
 Conductor::Conductor(std::string serial_port_name, unsigned int baud_rate)
@@ -177,7 +177,7 @@ void Conductor::send_payload(const std::vector<char> &data) {
     packet.push_back(static_cast<char>(sum_calc & 0xFF));
     
     // Send
-    esp_port->async_write_some( boost::asio::buffer(packet), boost::bind(&serial_write_handler, boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred) );
+    esp_port->async_write_some( boost::asio::buffer(packet), boost::bind(&Conductor::serial_write_handler, this, boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred) );
 
 }
 

@@ -76,7 +76,8 @@ int main(int argc, char*argv[])
     // }
 
     std::string file_name = "/dev/ttyS0";
-    Conductor *my_object = new Conductor(file_name);
+    unsigned int baud_rate = 57600;
+    Conductor *my_object = new Conductor(file_name, baud_rate);
 
 
     // // Set serial port params back to the original

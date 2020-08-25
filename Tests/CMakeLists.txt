@@ -18,8 +18,10 @@ INCLUDE_DIRECTORIES(${Boost_LIBRARIES})
 
 # include crc
 # INCLUDE_DIRECTORIES(${PROJECT_BINARY_DIR}/../CRCpp/inc/)
-# set(crc_directory, ${PROJECT_BINARY_DIR}/../CRCpp/inc)
-# INCLUDE_DIRECTORIES(${crc_directory})
+# set(CRC_DIRECTORY, ${PROJECT_SOURCE_DIR}/../CRCpp/inc/)
+# MESSAGE(STATUS "${CRC_DIRECTORY}")
+
+# INCLUDE_DIRECTORIES(${CRC_DIRECTORY})
 # INCLUDE_DIRECTORIES(/Users/samuelcarbone/Documents/cpp-projects/jevois_controller/CRCpp/inc/)
 INCLUDE_DIRECTORIES(~/Documents/cpp-playground/jevois_controller/CRCpp/inc/)
 

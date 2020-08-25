@@ -46,8 +46,15 @@ set(JSON_BuildTests OFF CACHE INTERNAL "")
 set(JSON_Install OFF CACHE INTERNAL "")
 add_subdirectory(json)
 
+INCLUDE_DIRECTORIES(${PROJECT_SOURCE_DIR}/CRCpp/inc/)
+
+set(SOURCES Sources/main.cpp Sources/conductor.cpp Sources/altitudeestimator.cpp Sources/altitudecontroller.cpp)
+
+set(HEADERS Headers/conductor.h Headers/altitudeestimator.h Headers/altitudecontroller.h CRCpp/inc/CRC.h)
+
 # add the executable
-add_executable(Main Sources/main.cpp Sources/conductor.cpp Sources/altitudeestimator.cpp Sources/altitudecontroller.cpp)
+# add_executable(Main Sources/main.cpp Sources/conductor.cpp Sources/altitudeestimator.cpp Sources/altitudecontroller.cpp)
+add_executable(Main ${SOURCES} ${HEADERS})
 
 # add_library(conductor_lib STATIC Sources/conductor.cpp)
 
