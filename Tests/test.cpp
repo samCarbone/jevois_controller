@@ -4,7 +4,7 @@
 
 #include <iostream>
 #include <boost/asio.hpp>
-#include <boost/bind.hpp>
+#include <boost/bind/bind.hpp>
 #include <boost/asio/serial_port.hpp>
 
 #include <string>
@@ -29,13 +29,15 @@ msg_type recv_state = IDLE_W;
 std::size_t payload_idx = 0;
 std::uint8_t cksum_hi = 0;
 
+void send_payload(std::vector<char> &data);
+
 
 int main(int argc, char*argv[])
 {
     boost::asio::io_service io;
     
     // Setup serial port
-    std::string file_name = "/dev/ttyACM0";
+    std::string serial_port_name = "/dev/ttyACM0";
     esp_port = new boost::asio::serial_port(io, serial_port_name);
     esp_port->set_option(boost::asio::serial_port_base::baud_rate(57600));
     esp_port->set_option(boost::asio::serial_port_base::flow_control(boost::asio::serial_port_base::flow_control::none));
@@ -44,7 +46,7 @@ int main(int argc, char*argv[])
     esp_port->set_option(boost::asio::serial_port_base::stop_bits(boost::asio::serial_port_base::stop_bits::one));
     
     // Setup serial read handler
-    esp_port->async_read_some(boost::asio::buffer(serial_read_buffer), boost::bind(&serial_read_handler, this, boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred));
+    esp_port->async_read_some(boost::asio::buffer(serial_read_buffer), boost::bind(&serial_read_handler, boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred));
 
     serial_payload.reserve(256);
     
@@ -119,8 +121,8 @@ void serial_read_handler(const boost::system::error_code& error, std::size_t byt
                 read_idx++;
                 
                 // Now check the checksum
-                std::uint16_t sum_recv = static_cast<std::uint16_t>(cksum_hi) << 8 + static_cast<std::uint16_t>(cksum_lo);
-                std::uint16_t sum_calc = CRC::Calculate(serial_payload.data(), serial_payload.size(), CRC::CRC_16_XMODEM);
+                std::uint16_t sum_recv = (static_cast<std::uint16_t>(cksum_hi) << 8) + static_cast<std::uint16_t>(cksum_lo);
+                std::uint16_t sum_calc = CRC::Calculate(serial_payload.data(), serial_payload.size(), CRC::CRC_16_XMODEM());
                 if(sum_calc == sum_recv) {
                     recv_state = VALID;
                 }
@@ -153,10 +155,18 @@ void serial_read_handler(const boost::system::error_code& error, std::size_t byt
     }
 
     
-    esp_port->async_read_some(boost::asio::buffer(serial_read_buffer), boost::bind(&serial_read_handler, this, boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred));
+    esp_port->async_read_some(boost::asio::buffer(serial_read_buffer), boost::bind(&serial_read_handler, boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred));
     
 }
 
+void serial_write_handler(const boost::system::error_code& error, std::size_t bytes_transferred)
+{
+    // This is called once the data is written to the serial port
+    if(!error)
+    {
+
+    }
+}
 
 
 // Function to construct/send packet
@@ -170,11 +180,12 @@ void send_payload(std::vector<char> &data) {
     packet.insert(packet.end(), data.begin(), data.begin()+payload_size);
     
     // Calculate the checksum
-    std::uint16_t sum_calc = CRC::Calculate(data.data(), payload_size, CRC::CRC_16_XMODEM);
+    std::uint16_t sum_calc = CRC::Calculate(data.data(), payload_size, CRC::CRC_16_XMODEM());
     packet.push_back(static_cast<char>((sum_calc & 0xFF00) >> 8));
     packet.push_back(static_cast<char>(sum_calc & 0xFF));
     
     // Send
-    esp_port->async_write_some( boost::asio::buffer(packet), boost::bind(&Conductor::serial_write_handler, this, boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred) );
+    esp_port->async_write_some( boost::asio::buffer(packet), boost::bind(&serial_write_handler, boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred) );
 
 }
+

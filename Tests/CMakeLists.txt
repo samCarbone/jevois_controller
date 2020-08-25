@@ -16,6 +16,12 @@ project(Test_CRC VERSION 1)
 set(Boost_LIBRARIES, "usr/include/boost")
 INCLUDE_DIRECTORIES(${Boost_LIBRARIES})
 
+# include crc
+# INCLUDE_DIRECTORIES(${PROJECT_BINARY_DIR}/../CRCpp/inc)
+# set(crc_directory, ${PROJECT_BINARY_DIR}/../CRCpp/inc)
+# INCLUDE_DIRECTORIES(${crc_directory})
+INCLUDE_DIRECTORIES(/Users/samuelcarbone/Documents/cpp-projects/jevois_controller/CRCpp/inc/)
+
 # add the executable
 add_executable(Test Test.cpp)
 
