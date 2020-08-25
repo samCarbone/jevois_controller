@@ -20,7 +20,7 @@ INCLUDE_DIRECTORIES(${Boost_LIBRARIES})
 add_executable(Test Test.cpp)
 
 # link boost library
-TARGET_LINK_LIBRARIES( Main LINK_PUBLIC ${Boost_LIBRARIES} -lboost_system -lboost_regex -lboost_thread -lpthread -ltbb -ldl -lutil -lm)
+TARGET_LINK_LIBRARIES( Test  LINK_PUBLIC ${Boost_LIBRARIES} -lboost_system -lboost_regex -lboost_thread -lpthread -ltbb -ldl -lutil -lm)
 
 
 
