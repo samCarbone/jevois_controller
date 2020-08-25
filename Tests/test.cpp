@@ -20,7 +20,6 @@ boost::asio::serial_port* esp_port;
 void serial_read_handler(const boost::system::error_code& error, std::size_t bytes_transferred);
 void serial_write_handler(const boost::system::error_code& error, std::size_t bytes_transferred);
 std::array<char, 256> serial_read_buffer;
-std::array<char, 256> serial_write_buffer;
 
 std::vector<char> serial_payload;
 std::size_t payload_len = 0;
@@ -30,7 +29,6 @@ std::size_t payload_idx = 0;
 std::uint8_t cksum_hi = 0;
 
 void send_payload(std::vector<char> &data);
-
 
 int main(int argc, char*argv[])
 {

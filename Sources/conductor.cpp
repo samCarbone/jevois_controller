@@ -9,12 +9,12 @@ Conductor::Conductor()
 	Conductor("/dev/ttyS0");
 }
 
-Conductor::Conductor(std::string serial_port_name)
+Conductor::Conductor(std::string serial_port_name, unsigned int baud_rate)
 {
 
     // Construct and open the serial port
     esp_port = new boost::asio::serial_port(io, serial_port_name);
-    esp_port->set_option(boost::asio::serial_port_base::baud_rate(57600));
+    esp_port->set_option(boost::asio::serial_port_base::baud_rate(baud_rate));
     esp_port->set_option(boost::asio::serial_port_base::flow_control(boost::asio::serial_port_base::flow_control::none));
     esp_port->set_option(boost::asio::serial_port_base::character_size(8));
     esp_port->set_option(boost::asio::serial_port_base::parity(boost::asio::serial_port_base::parity::none));
@@ -22,7 +22,7 @@ Conductor::Conductor(std::string serial_port_name)
     
     // Setup serial read handler
     esp_port->async_read_some(boost::asio::buffer(serial_read_buffer), boost::bind(&Conductor::serial_read_handler, this, boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred));
-    serial_read_concat.reserve(256);
+    serial_payload.reserve(256);
 
     // Epoch time for receiving esp messages
     start_time_jv = std::chrono::steady_clock::now();
@@ -65,127 +65,93 @@ Conductor::~Conductor()
 //
 // **********************************************************
 
-// [{, }]
-bool Conductor::find_json_start(std::vector<char> &data, int search_start, int &start)
-{
-    start = search_start;
-    for(int i=search_start; i<data.size(); i++) {
-        if(data.at(i) == '{') {
-            start = i;
-            return true;
-        }
-    }
-    return false;
-}
 
-
-bool Conductor::find_json_overlap(std::vector<char> &prev_data, std::vector<char> &data, int &end_delta)
-{
-
-    const std::vector<char> END_SEQ = {'}', '\r', '\n'};
-
-    // Not the neatest solution, but hard-coded check the two overlap cases
-    if(prev_data.size() >= 2 && (int)data.size() >= 1) {
-        if(prev_data.at(prev_data.size()-2) == END_SEQ.at(0) && prev_data.at(prev_data.size()-1) == END_SEQ.at(1) && data.at(0) == END_SEQ.at(2))
-        { 
-            end_delta = -2;
-            return true; 
-        }
-    }
-    
-    if(prev_data.size() >= 1 && (int)data.size() >= 2) {
-        if(prev_data.back() == END_SEQ.at(0) && data.at(0) == END_SEQ.at(1) && data.at(1) == END_SEQ.at(2)) 
-        {
-            end_delta = -1;
-            return true; 
-        }
-    }
-
-    return false;
-
-}
-
-// [{, }]
-bool Conductor::find_json_end(std::vector<char> &prev_data, std::vector<char> &data, int search_start, int &end)
-{
-    const std::vector<char> END_SEQ = {'}', '\r', '\n'};
-    end = search_start;
-    for(int i=search_start; i<(int)data.size()-(int)END_SEQ.size()+1; i++) {
-        if(std::equal(data.begin()+i, data.begin()+i+END_SEQ.size(), END_SEQ.begin(), END_SEQ.end())) {
-            end = i;
-            return true;
-        }
-    }
-    return false;
-}
 
 void Conductor::serial_read_handler(const boost::system::error_code& error, std::size_t bytes_transferred)
 {
     if(!error)
     {
 
-        // TODO: look at eliminating this copy
-        std::vector<char> payload(serial_read_buffer.begin(), serial_read_buffer.begin()+bytes_transferred);
-
-        bool finished = false; // Done processing this current payload
-        int start = 0;
-        int search_begin_idx = 0;
-        while(!finished) {
+        std::size_t bytes_available = bytes_transferred;
+        std::size_t read_idx = 0;
+        while(read_idx < bytes_transferred) {
+        
+            if(recv_state == IDLE_W) {
+                if(serial_read_buffer.at(read_idx) == '#') {
+                    recv_state = SOF_A;
+                }
+                read_idx++;
+            }
             
-            // try {
-            if(!found_start) {
-                // Find start
-                if(find_json_start(payload, search_begin_idx, start)) {
-                    serial_read_concat.clear();
-                    found_start = true;
+            if(recv_state == SOF_A && read_idx < bytes_transferred) {
+                if(serial_read_buffer.at(read_idx) == 'S') {
+                    recv_state = LEN_LO;
+                }
+                else if(serial_read_buffer.at(read_idx) == '#') {
+                    recv_state = SOF_A;
                 }
                 else {
-                    finished = true;
+                    recv_state = IDLE_W;
                 }
+                read_idx++;
             }
-
-            if(found_start) {
+            
+            if(recv_state == LEN_LO && read_idx < bytes_transferred) {
+                payload_len = serial_read_buffer.at(read_idx);
+                payload_idx = 0;
+                serial_payload.clear();
+                recv_state = PAYLOAD;
+                read_idx++;
+            }
+            
+            if(recv_state == PAYLOAD) {
+                if(bytes_transferred < read_idx || payload_len < payload_idx) {
+                    recv_state = IDLE_W; // Reset the state
+                    break;
+                }
+                std::size_t read_len = (bytes_transferred - read_idx) < (payload_len - payload_idx) ? (bytes_transferred - read_idx) : (payload_len - payload_idx);
+                if(read_len > 0) {
+                    serial_payload.insert(serial_payload.end(), serial_read_buffer.begin()+read_idx, serial_read_buffer.begin()+read_idx+read_len);
+                    payload_idx += read_len;
+                }
+                if(payload_idx >= payload_len) {
+                    recv_state = CRC_HI;
+                }
+                read_idx += read_len;
+            }
+            
+            if(recv_state == CRC_HI && read_idx < bytes_transferred) {
+                cksum_hi = serial_read_buffer.at(read_idx);
+                read_idx++;
+                recv_state = CRC_LO;
+            }
+            
+            if(recv_state == CRC_LO && read_idx < bytes_transferred) {
+                std::uint8_t cksum_lo = serial_read_buffer.at(read_idx);
+                read_idx++;
                 
-                int end = 0;
-                int end_delta = 0;
-                if(start == 0 && find_json_overlap(serial_read_concat, payload, end_delta)) {
-                    // at the end ---> -1, second last --> -2
-                    search_begin_idx = 2;
-                    if(end_delta == -2) {
-                        serial_read_concat.erase(serial_read_concat.end()-1, serial_read_concat.end());
-                        search_begin_idx = 1;
-                    }
-                    parse_packet(serial_read_concat, 0, serial_read_concat.size());
-                    found_start = false;
+                // Now check the checksum
+                std::uint16_t sum_recv = (static_cast<std::uint16_t>(cksum_hi) << 8) + static_cast<std::uint16_t>(cksum_lo);
+                std::uint16_t sum_calc = CRC::Calculate(serial_payload.data(), serial_payload.size(), CRC::CRC_16_XMODEM());
+                if(sum_calc == sum_recv) {
+                    recv_state = VALID;
                 }
-
-                else if(find_json_end(serial_read_concat, payload, start, end)) {
-                    serial_read_concat.insert(serial_read_concat.end(), payload.begin()+start, payload.begin()+end+1);
-                    parse_packet(serial_read_concat, 0, serial_read_concat.size());
-                    search_begin_idx = end+3;
-                    found_start = false;
-                }
-
                 else {
-
-                    if((int)serial_read_concat.size()+((int)payload.size()- start) > SRC_MAX_LEN) {
-                        // Disregard this payload and reset
-                        found_start = false;
-                    }
-                    else {
-                        serial_read_concat.insert(serial_read_concat.end(), payload.begin()+start, payload.end());
-                                        
-                    }
-                    finished = true;
-
+                    recv_state = IDLE_W;
                 }
+                
             }
-            else {
-                finished = true;
+            
+            if(recv_state == VALID) {
+                // Now process the payload
+                // ----- //
+                parse_packet(serial_payload);
+                
+                // Reset the state
+                recv_state = IDLE_W;
+                
             }
-
         }
-
     }
     else {
         pub_log_check("Serial read error", ERROR, true);
@@ -195,38 +161,30 @@ void Conductor::serial_read_handler(const boost::system::error_code& error, std:
 
 }
 
-// bool Conductor::find_first_json(const std::vector<char> &inVec, int &start, int &end)
-// {
+// Function to construct/send packet
+void Conductor::send_payload(const std::vector<char> &data) {
+    std::vector<char> packet;
+    packet.reserve(data.size() + 5);
+    packet.push_back('#');
+    packet.push_back('S');
+    std::uint8_t payload_size = data.size() <= 255 ? data.size() : 255;
+    packet.push_back(static_cast<char>(payload_size));
+    packet.insert(packet.end(), data.begin(), data.begin()+payload_size);
+    
+    // Calculate the checksum
+    std::uint16_t sum_calc = CRC::Calculate(data.data(), payload_size, CRC::CRC_16_XMODEM());
+    packet.push_back(static_cast<char>((sum_calc & 0xFF00) >> 8));
+    packet.push_back(static_cast<char>(sum_calc & 0xFF));
+    
+    // Send
+    esp_port->async_write_some( boost::asio::buffer(packet), boost::bind(&serial_write_handler, boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred) );
 
-//     bool found_start = false;
-//     start = 0;
-//     end = 0;
-//     std::array<char, 3> DELIM = {'}', '\r', '\n'};
-//     // Search for the start
-//     for(int i=0; i<inVec.size()-DELIM.size(); i++) {
-//         if(inVec.at(i) == '{') {
-//             start = i;
-//             found_start = true;
-//             break;
-//         }
-//     }
+}
 
-//     if(found_start) {
-//         // Search for the end
-//         for(int i=start+1; i<inVec.size()-DELIM.size()+1; i++) {
-//             bool is_end = true;
-//             for(int j=0; j<DELIM.size()&&is_end; j++) {
-//                 is_end &= inVec.at(i+j) == DELIM.at(j);
-//             }
-//             if(is_end) {
-//                 end = i;
-//                 return true;
-//             }
-//         }
-//     } 
-//     return false;    
-// }
-
+void Conductor::send_payload(const std::string &data_str) {
+    std::vector<char> data(data_str.begin(), data_str.end());
+    send_payload(data);
+}
 
 // [start, end] --> [", "]
 bool Conductor::find_first_msp(const std::vector<char> &inVec, int &start, int &end)
@@ -294,11 +252,11 @@ bool Conductor::find_first_msp(const std::vector<char> &inVec, int &start, int &
 
 }
 
-// [start, end)
-void Conductor::parse_packet(const std::vector<char> &inVec, const int start, const int end)
+// [{, }]
+void Conductor::parse_packet(const std::vector<char> &inVec)
 {
     // Copy into a new vector --> not ideal if not necessary
-    std::vector<char> cut_vec(inVec.begin()+start, inVec.begin()+end);
+    std::vector<char> cut_vec(inVec.begin(), inVec.end());
 
     /* Note: this does not support multiple msp messages
     within a single json packet. It will use the first msp message.
@@ -326,17 +284,9 @@ void Conductor::parse_packet(const std::vector<char> &inVec, const int start, co
             }
         }
     }
-    // } catch (const std::exception& e) {
-    //     std::cerr << "[caught: find_first_msp] " << e.what() << std::endl;    
-    //     return;
-    // }
 
-    // Echo the cut vector
-    // esp_port->async_write_some( boost::asio::buffer(cut_vec), boost::bind(&Conductor::serial_write_handler, this, boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred) );
-
-    // Catch all exceptions
+    // Catch all exceptions during parsing
     // We want to keep the program running and just ignore invalid json packets
-    
     json j_doc;
     try {
         j_doc = json::parse(cut_vec);
@@ -345,11 +295,7 @@ void Conductor::parse_packet(const std::vector<char> &inVec, const int start, co
         std::cerr << "[caught] " << e.what() << std::endl;   
         return; 
     }
-        // Echo the json packet
-        // std::string s = j_doc.dump();
-        // s += '\r\n';
-        // esp_port->async_write_some( boost::asio::buffer(s), boost::bind(&Conductor::serial_write_handler, this, boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred) );
-
+        
     if(j_doc.is_null())
             return;
 
@@ -554,10 +500,8 @@ void Conductor::send_mode(const bool active)
     send_doc["mode"] = active ? 1 : 2; // TODO: change to enum
 
     // Echo the json packet
-    std::string s = send_doc.dump();
-    s += "\r\n";
-    esp_port->async_write_some( boost::asio::buffer(s), boost::bind(&Conductor::serial_write_handler, this, boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred) );
-
+    std::string s = send_doc.dump();    
+    send_payload(s);
 }
 
 void Conductor::send_landing(const bool active)
@@ -570,8 +514,7 @@ void Conductor::send_landing(const bool active)
 
     // Echo the json packet
     std::string s = send_doc.dump();
-    s += "\r\n";
-    esp_port->async_write_some( boost::asio::buffer(s), boost::bind(&Conductor::serial_write_handler, this, boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred) );
+    send_payload(s);
 
 }
 
@@ -680,14 +623,14 @@ void Conductor::send_channels(const std::array<double, 16> &channels, const bool
     std::string pre_string = "{\"snd\":\"pc\",\"dst\":\"fc\",\"typ\":\"msp\",\"rsp\":";
     pre_string += response ? "\"true\"" : "\"false\"";
     pre_string += ",\"ctrl\":\"true\",\"msp\":\"";
-    std::string post_string = "\"}\r\n";
+    std::string post_string = "\"}";
 
     std::vector<char> all_data(pre_string.begin(), pre_string.end());
     all_data.insert(all_data.end(), msp_data.begin(), msp_data.end());
     all_data.insert(all_data.end(), post_string.begin(), post_string.end());
 
     // Write to serial
-    esp_port->async_write_some( boost::asio::buffer(all_data), boost::bind(&Conductor::serial_write_handler, this, boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred) );
+    send_payload(all_data);
 
 }
 
@@ -724,8 +667,7 @@ void Conductor::send_log(const std::string &in_str, int log_level)
 
     // Echo the json packet
     std::string s = send_doc.dump();
-    s += "\r\n";
-    esp_port->async_write_some( boost::asio::buffer(s), boost::bind(&Conductor::serial_write_handler, this, boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred) );
+    send_payload(s);
 
 }
 

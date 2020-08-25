@@ -8,13 +8,15 @@
 #include <vector>
 #include <array>
 #include <math.h>
+#include <cstdint>
 
 #include <boost/asio.hpp>
-#include <boost/bind.hpp>
+#include <boost/bind/bind.hpp>
 #include <boost/asio/serial_port.hpp>
 #include <boost/asio/high_resolution_timer.hpp>
 #include <boost/date_time/posix_time/posix_time.hpp>
 #include <nlohmann/json.hpp>
+#include <CRC.h>
 
 #include "def.h"
 #include "altitudeestimator.h"
@@ -23,6 +25,7 @@
 using json = nlohmann::json;
 
 enum log_levels { ALL, DEBUG, INFO, WARN, ERROR, FATAL, OFF };
+enum msg_type {IDLE_W, SOF_A, LEN_LO, PAYLOAD, CRC_HI, CRC_LO, VALID};
 
 const int GLOBAL_LOG_LEVEL = INFO;
 
@@ -31,21 +34,27 @@ class Conductor
 
 public:
     Conductor();
-    Conductor(std::string serial_port_name);
+    Conductor(std::string serial_port_name, unsigned int baud_rate);
     ~Conductor();        
 
 private:
+
+    // Boost serial
     boost::asio::io_service io;
     boost::asio::serial_port* esp_port;
     void serial_read_handler(const boost::system::error_code& error, std::size_t bytes_transferred);
     void serial_write_handler(const boost::system::error_code& error, std::size_t bytes_transferred);
     std::array<char, 256> serial_read_buffer;
-    std::array<char, 256> serial_write_buffer;
-    std::vector<char> serial_read_concat;
+    std::vector<char> serial_payload;
+    std::size_t payload_len = 0;
+    msg_type recv_state = IDLE_W;
+    std::size_t payload_idx = 0;
+    std::uint8_t cksum_hi = 0;
+    void send_payload(const std::vector<char> &data);
+    void send_payload(const std::string &data_str);
 
-
+    // Boost timer
     void sendTimerDone();
-
     const int SEND_CONTROL_PERIOD_MS = 1000; // ms, time between sending control commansd
     const int PROP_LIMIT = 100;
 
@@ -78,7 +87,7 @@ private:
     void send_channels(const std::array<double, 16> &channels, const bool response=false);
     // bool find_first_json(const std::vector<char> &inVec, int &start, int &end);
     bool find_first_msp(const std::vector<char> &inVec, int &start, int &end);
-    void parse_packet(const std::vector<char> &inVec, const int start, const int end);
+    void parse_packet(const std::vector<char> &inVec);
     void parse_mode(const json &mode_obj);
     void parse_landing(const json &land_obj);
     void parse_altitude(const json &alt_obj);
