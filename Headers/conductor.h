@@ -19,6 +19,7 @@
 #include <CRC.h>
 
 #include "def.h"
+#include "my_enums.h"
 #include "altitudeestimator.h"
 #include "altitudecontroller.h"
 
@@ -55,8 +56,7 @@ private:
 
     // Boost timer
     void sendTimerDone();
-    const int SEND_CONTROL_PERIOD_MS = 1000; // ms, time between sending control commansd
-    const int PROP_LIMIT = 100;
+    const long int PROP_LIMIT = 100;
 
 
     // Channels
@@ -81,16 +81,17 @@ private:
     boost::asio::high_resolution_timer* send_timer;
     const long CONTROL_LOOP_PERIOD_MS = 50; // ms
     void timer_handler(const boost::system::error_code& error);
-    int time_elapsed_ms();
+    long int time_elapsed_ms();
 
     // Comms
     void send_channels(const std::array<double, 16> &channels, const bool response=false);
     // bool find_first_json(const std::vector<char> &inVec, int &start, int &end);
     bool find_first_msp(const std::vector<char> &inVec, int &start, int &end);
     void parse_packet(const std::vector<char> &inVec);
-    void parse_mode(const json &mode_obj);
-    void parse_landing(const json &land_obj);
-    void parse_altitude(const json &alt_obj);
+    // void parse_mode(const json &mode_obj);
+    // void parse_landing(const json &land_obj);
+    // void parse_altitude(const json &alt_obj);
+    void parse_altitude(const std::vector<unsigned char> &altData);
     void send_mode(const bool active);
     void send_landing(const bool active);
     void pub_log_check(const std::string &in_str, int log_level, bool send);

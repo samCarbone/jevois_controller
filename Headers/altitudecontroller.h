@@ -40,8 +40,8 @@ private:
     bool validStateSet = false;
     Eigen::Matrix<double, 3, 1> Dx; // [Delta z (m), Delta z_dot (mm/ms), Delta z_int (m.s)]
     Eigen::Matrix<double, 2, 1> x_target; // [z (m), z_dot (mm/ms)]
-    int currentTimeEsp_ms;
-    int currentTimePc_ms;
+    long int currentTimeEsp_ms;
+    long int currentTimePc_ms;
     bool targetIsSet = false;
     Eigen::Matrix<double, 1, 3> B; // [P D I]
     double thrSS = -47.8935;

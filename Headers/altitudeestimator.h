@@ -17,10 +17,10 @@ public:
     void resetStateEstimate();
     void addRangeMeasurement(RangingData_t rangeData);
     AltState_t getStateEstimate();
-    AltState_t getPropagatedStateEstimate(int newTimePc_ms);
-    AltState_t getPropagatedStateEstimate_safe(int newTimePc_ms, int limitDelta_ms);
-    int getCurrentTimePc_ms();
-    int getCurrentTimeEsp_ms();
+    AltState_t getPropagatedStateEstimate(long int newTimePc_ms);
+    AltState_t getPropagatedStateEstimate_safe(long int newTimePc_ms, long int limitDelta_ms);
+    long int getCurrentTimePc_ms();
+    long int getCurrentTimeEsp_ms();
 
     // Attributes
 
@@ -36,8 +36,8 @@ private:
     // Methods
 
     // Attributes
-    int currentTimePc_ms;
-    int currentTimeEsp_ms;
+    long int currentTimePc_ms;
+    long int currentTimeEsp_ms;
     Eigen::Matrix<double, 2, 1> x; // [z (mm), z_dot (mm/ms)]
     Eigen::Matrix<double, 2, 2> P;
     double sigma_v = 100; // mm/s, process uncertainty in velocity

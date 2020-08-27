@@ -50,7 +50,7 @@ INCLUDE_DIRECTORIES(${PROJECT_SOURCE_DIR}/CRCpp/inc/)
 
 set(SOURCES Sources/main.cpp Sources/conductor.cpp Sources/altitudeestimator.cpp Sources/altitudecontroller.cpp)
 
-set(HEADERS Headers/conductor.h Headers/altitudeestimator.h Headers/altitudecontroller.h CRCpp/inc/CRC.h)
+set(HEADERS Headers/conductor.h Headers/altitudeestimator.h Headers/altitudecontroller.h Headers/def.h Headers/my_enums.h CRCpp/inc/CRC.h)
 
 # add the executable
 # add_executable(Main Sources/main.cpp Sources/conductor.cpp Sources/altitudeestimator.cpp Sources/altitudecontroller.cpp)

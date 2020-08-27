@@ -109,7 +109,7 @@ AltState_t AltitudeEstimator::getStateEstimate()
     return stateResult;
 }
 
-AltState_t AltitudeEstimator::getPropagatedStateEstimate(int newTimePc_ms)
+AltState_t AltitudeEstimator::getPropagatedStateEstimate(long int newTimePc_ms)
 {
     // Time difference based on PC time
     double Delta_t = (newTimePc_ms - currentTimePc_ms)/1000.0;
@@ -141,7 +141,7 @@ AltState_t AltitudeEstimator::getPropagatedStateEstimate(int newTimePc_ms)
     return stateResult;
 }
 
-AltState_t AltitudeEstimator::getPropagatedStateEstimate_safe(int newTimePc_ms, int limitDelta_ms)
+AltState_t AltitudeEstimator::getPropagatedStateEstimate_safe(long int newTimePc_ms, long int limitDelta_ms)
 {
     int Delta_t = newTimePc_ms - currentTimePc_ms;
     if(Delta_t > limitDelta_ms) {
@@ -152,12 +152,12 @@ AltState_t AltitudeEstimator::getPropagatedStateEstimate_safe(int newTimePc_ms, 
     return getPropagatedStateEstimate(newTimePc_ms);
 }
 
-int AltitudeEstimator::getCurrentTimePc_ms()
+long int AltitudeEstimator::getCurrentTimePc_ms()
 {
     return currentTimePc_ms;
 }
 
-int AltitudeEstimator::getCurrentTimeEsp_ms()
+long int AltitudeEstimator::getCurrentTimeEsp_ms()
 {
     return currentTimeEsp_ms;
 }

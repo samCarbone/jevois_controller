@@ -9,17 +9,17 @@ typedef struct {
     double sigma_mm; // mm
     double eff_spad_count;
     int range_mm; // mm
-    int timeEsp_ms; // ms, time on arduino when measurement was conducted
+    long int timeEsp_ms; // ms, time on arduino when measurement was conducted
                    // only valid on a system with 32-bit ints, otherwise overflow will occur
     int status; //
-    int timePc_ms; // ms, since start of system timer
+    long int timePc_ms; // ms, since start of system timer
 } RangingData_t;
 
 typedef struct {
     double z;
     double z_dot;
-    int timeEsp_ms;
-    int timePc_ms;
+    long int timeEsp_ms;
+    long int timePc_ms;
     Eigen::Matrix<double, 2, 2> P;
     bool valid;
 
@@ -50,5 +50,46 @@ typedef struct {
 #define	VL53L1_RANGESTATUS_MIN_RANGE_FAIL			13          /*!<User ROI input is not valid e.g. beyond SPAD Array.*/
 #define	VL53L1_RANGESTATUS_RANGE_INVALID			14          /*!<lld returned valid range but negative value ! */
 #define	 VL53L1_RANGESTATUS_NONE				255             /*!<No Update. */
+
+
+typedef struct {
+    std::uint32_t TimeStamp;
+        /*!< 32-bit time stamp.
+         * Time ESP received the data
+         */
+
+    std::uint8_t StreamCount;
+        /*!< 8-bit Stream Count. */
+
+    FixPoint1616_t SignalRateRtnMegaCps;
+        /*!< Return signal rate (MCPS)\n these is a 16.16 fix point
+         *  value, which is effectively a measure of target
+         *   reflectance.
+         */
+
+    FixPoint1616_t AmbientRateRtnMegaCps;
+        /*!< Return ambient rate (MCPS)\n these is a 16.16 fix point
+         *  value, which is effectively a measure of the ambien
+         *  t light.
+         */
+
+    std::uint16_t EffectiveSpadRtnCount;
+        /*!< Return the effective SPAD count for the return signal.
+         *  To obtain Real value it should be divided by 256
+         */
+
+    FixPoint1616_t SigmaMilliMeter;
+        /*!< Return the Sigma value in millimeter */
+
+    std::int16_t RangeMilliMeter;
+        /*!< range distance in millimeter. This should be between
+         *  RangeMinMilliMeter and RangeMaxMilliMeter
+         */
+
+    std::uint8_t RangeStatus;
+        /*!< Range Status for the current measurement. This is device
+         *  dependent. Value = 0 means value is valid.
+         */
+} mod_VL53L1_RangingMeasurementData_t;
 
 #endif // DEF_H

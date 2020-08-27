@@ -40,7 +40,7 @@ Conductor::Conductor(std::string serial_port_name, unsigned int baud_rate)
     set_file_directory("/jevois/scripts/logs");
     open_files();
 
-    pub_log_check("Started", INFO, true);
+    pub_log_check("Started", LL_INFO, true);
 
     // Run boost io
     io.run();
@@ -154,7 +154,7 @@ void Conductor::serial_read_handler(const boost::system::error_code& error, std:
         }
     }
     else {
-        pub_log_check("Serial read error", ERROR, true);
+        pub_log_check("Serial read error", LL_ERROR, true);
     }
 
     esp_port->async_read_some(boost::asio::buffer(serial_read_buffer), boost::bind(&Conductor::serial_read_handler, this, boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred));
@@ -255,94 +255,160 @@ bool Conductor::find_first_msp(const std::vector<char> &inVec, int &start, int &
 // [{, }]
 void Conductor::parse_packet(const std::vector<char> &inVec)
 {
-    // Copy into a new vector --> not ideal if not necessary
-    std::vector<char> cut_vec(inVec.begin(), inVec.end());
+    // // Copy into a new vector --> not ideal if not necessary
+    // std::vector<char> cut_vec(inVec.begin(), inVec.end());
 
-    /* Note: this does not support multiple msp messages
-    within a single json packet. It will use the first msp message.
-    */
-    // MSP search ({,)"msp":"*"(,})
+    // /* Note: this does not support multiple msp messages
+    // within a single json packet. It will use the first msp message.
+    // */
+    // // MSP search ({,)"msp":"*"(,})
+    // // try {
+    // std::vector<char> msp_vec;
+    // bool found_msp = false;
+    // int start_msp = 0;
+    // int end_msp = 0;
+    // if(find_first_msp(cut_vec, start_msp, end_msp)) {
+    //     // copy and erase between the " "
+    //     msp_vec.insert(msp_vec.begin(), cut_vec.begin()+start_msp+1, cut_vec.begin()+end_msp);
+    //     cut_vec.erase(cut_vec.begin()+start_msp+1, cut_vec.begin()+end_msp);
+
+    //     found_msp = true;
+    // }
+    // else {
+    //     // Safe any bytes outside acceptable range
+    //     for (int i=0; i<cut_vec.size(); i++) {
+    //         if(cut_vec.at(i) <= 31) {
+    //             if(cut_vec.at(i) == '\r') {cut_vec.at(i) = 'r';}
+    //             else if(cut_vec.at(i) == '\n') {cut_vec.at(i) = 'n';}
+    //             else {cut_vec.at(i) = '#';}
+    //         }
+    //     }
+    // }
+
+    // // Catch all exceptions during parsing
+    // // We want to keep the program running and just ignore invalid json packets
+    // json j_doc;
     // try {
-    std::vector<char> msp_vec;
-    bool found_msp = false;
-    int start_msp = 0;
-    int end_msp = 0;
-    if(find_first_msp(cut_vec, start_msp, end_msp)) {
-        // copy and erase between the " "
-        msp_vec.insert(msp_vec.begin(), cut_vec.begin()+start_msp+1, cut_vec.begin()+end_msp);
-        cut_vec.erase(cut_vec.begin()+start_msp+1, cut_vec.begin()+end_msp);
-
-        found_msp = true;
-    }
-    else {
-        // Safe any bytes outside acceptable range
-        for (int i=0; i<cut_vec.size(); i++) {
-            if(cut_vec.at(i) <= 31) {
-                if(cut_vec.at(i) == '\r') {cut_vec.at(i) = 'r';}
-                else if(cut_vec.at(i) == '\n') {cut_vec.at(i) = 'n';}
-                else {cut_vec.at(i) = '#';}
-            }
-        }
-    }
-
-    // Catch all exceptions during parsing
-    // We want to keep the program running and just ignore invalid json packets
-    json j_doc;
-    try {
-        j_doc = json::parse(cut_vec);
-    } catch(const std::exception& e) {
-        pub_log_check("JSON parse error", ERROR, true);
-        std::cerr << "[caught] " << e.what() << std::endl;   
-        return; 
-    }
+    //     j_doc = json::parse(cut_vec);
+    // } catch(const std::exception& e) {
+    //     pub_log_check("JSON parse error", LL_ERROR, true);
+    //     std::cerr << "[caught] " << e.what() << std::endl;   
+    //     return; 
+    // }
         
-    if(j_doc.is_null())
-            return;
+    // if(j_doc.is_null())
+    //         return;
 
-    if (j_doc["dst"] != "jv") {
-        pub_log_check("Incorrect json dest", ERROR, true);
+    // if (j_doc["dst"] != "jv") {
+    //     pub_log_check("Incorrect json dest", LL_ERROR, true);
+    //     return;
+    // }
+
+    // pub_log_check("JSON received", LL_DEBUG, true);
+
+    // if(j_doc["snd"] == "esp") {
+
+    //     if(j_doc["typ"] == "alt") {
+    //         parse_altitude(j_doc["alt"]);
+    //         pub_log_check("Altitude received", LL_DEBUG, true);
+    //     }
+        
+    //     else if(j_doc["typ"] == "msp") {
+    //         // Need to search for the msp bytes
+    //         // parse_msp(std::vector<char> msp_vec);
+    //         pub_log_check("MSP received", LL_DEBUG, true);
+    //     }
+
+    // }
+
+    // else if (j_doc["snd"] == "pc") {
+
+    //     if(j_doc["typ"] == "mode") {
+    //         pub_log_check("Mode received", LL_DEBUG, true);
+    //         parse_mode(j_doc);
+    //     }
+
+    //     else if(j_doc["typ"] == "land") {
+    //         pub_log_check("Landing received", LL_DEBUG, true);
+    //         parse_landing(j_doc);
+    //     }
+
+    //     else if(j_doc["typ"] == "quit") {
+    //         set_controller_activity(false);
+    //         pub_log_check("Quit", LL_INFO, true); // Might not send
+    //         send_timer->cancel();
+    //         esp_port->cancel();
+    //         esp_port->close();
+    //     }
+
+    // }
+
+    if(inVec.size()<4) { return; }
+    char src = inVec.at(0);
+    char dst = inVec.at(1);
+    char mid = inVec.at(2);
+    char rsp = inVec.at(3);
+
+    if(dst != DST_JV) {
+        pub_log_check("Incorrect packet dest", LL_ERROR, true);
         return;
     }
 
-    pub_log_check("JSON received", DEBUG, true);
+    if(src == SRC_ESP) {
 
-    if(j_doc["snd"] == "esp") {
-
-        if(j_doc["typ"] == "alt") {
-            parse_altitude(j_doc["alt"]);
-            pub_log_check("Altitude received", DEBUG, true);
+        if(mid == MID_ALT) {
+            std::vector<unsigned char> alt_data(inVec.begin()+4, inVec.end())
+            parse_altitude(alt_data);
         }
         
-        else if(j_doc["typ"] == "msp") {
-            // Need to search for the msp bytes
-            // parse_msp(std::vector<char> msp_vec);
-            pub_log_check("MSP received", DEBUG, true);
-        }
-
     }
+    else if(src == SRC_PC) {
+        if(mid == MID_MODE && inVec.size() == 5) {
+            if(inVec.at(4) == JV_CTRL_ENA) {
+                set_controller_activity(true);
+                pub_log_check("Controller started", LL_INFO, true);
+            }
+            else if(inVec.at(4) == JV_CTRL_DIS) {
+                set_controller_activity(false);
+                pub_log_check("Controller stopped", LL_INFO, true);
+            }
 
-    else if (j_doc["snd"] == "pc") {
-
-        if(j_doc["typ"] == "mode") {
-            pub_log_check("Mode received", DEBUG, true);
-            parse_mode(j_doc);
+            if(rsp == RSP_TRUE) {
+                send_mode(controller_activity);
+            }
         }
+        else if(mid == MID_LAND && inVec.size() == 5) {
+            if(inVec.at(4) == JV_LAND_ENA) {
+                set_landing(true);
+                pub_log_check("Landing started", LL_INFO, true);
+            }
+            else if(inVec.at(4) == JV_LAND_DIS) {
+                set_landing(false);
+                pub_log_check("Landing stopped", LL_INFO, true);
+            }
 
-        else if(j_doc["typ"] == "land") {
-            pub_log_check("Landing received", DEBUG, true);
-            parse_landing(j_doc);
+            if(rsp == RSP_TRUE) {
+                send_landing(landing);
+            }  
         }
-
-        else if(j_doc["typ"] == "quit") {
-            set_controller_activity(false);
-            pub_log_check("Quit", INFO, true); // Might not send
-            send_timer->cancel();
-            esp_port->cancel();
-            esp_port->close();
+        else if(mid == MID_QUIT %% inVec.size() == 5) {
+            if(inVec.at(4) == JV_QUIT_TRUE) {
+                set_controller_activity(false);
+                pub_log_check("Quit", LL_INFO, true); // Might not send
+                send_timer->cancel();
+                esp_port->cancel();
+                esp_port->close();
+            }
+            else {
+                pub_log_check("Not quit", LL_INFO, true); // Not necessary
+            }
         }
-
     }
+    else if(src == SRC_FC) {
+        if(mid == MID_MSP) {
 
+        }
+    }
 
 }
 
@@ -354,41 +420,108 @@ void Conductor::serial_write_handler(const boost::system::error_code& error, std
 
     }
     else {
-        pub_log_check("Serial write error", ERROR, true);
+        pub_log_check("Serial write error", LL_ERROR, true);
     }
 }
 
 
 
-void Conductor::parse_altitude(const json &alt_obj)
+// void Conductor::parse_altitude(const json &alt_obj)
+// {
+//     if(alt_obj.contains("sigrt") && alt_obj.contains("ambrt") && alt_obj.contains("sigma")
+//             && alt_obj.contains("spad") && alt_obj.contains("range") && alt_obj.contains("time")
+//             && alt_obj.contains("status") )
+//     {
+//         RangingData_t altData;
+//         altData.signal_rate = alt_obj["sigrt"].get<double>();
+//         altData.ambient_rate = alt_obj["ambrt"].get<double>();
+//         altData.sigma_mm = alt_obj["sigma"].get<double>();
+//         altData.eff_spad_count = alt_obj["spad"].get<double>()/256.0; // divide by 256 for real value
+//         altData.range_mm = alt_obj["range"].get<int>();
+//         altData.timeEsp_ms = alt_obj["time"].get<int>();
+//         altData.status = alt_obj["status"].get<int>();
+//         altData.timePc_ms = time_elapsed_ms();
+
+//         // Update state estimate
+//         alt_estimator->addRangeMeasurement(altData);
+//         AltState_t estimatedState = alt_estimator->getStateEstimate();
+
+//         // Update controller
+//         if(controller_activity) {
+//             alt_controller->addEstState(estimatedState);
+//         }
+
+//     }
+//     else 
+//     {
+//         pub_log_check("Invalid alt packet", LL_ERROR, true);
+//     }
+
+// }
+
+void Conductor::parse_altitude(const std::vector<unsigned char> &altData)
 {
-    if(alt_obj.contains("sigrt") && alt_obj.contains("ambrt") && alt_obj.contains("sigma")
-            && alt_obj.contains("spad") && alt_obj.contains("range") && alt_obj.contains("time")
-            && alt_obj.contains("status") )
-    {
-        RangingData_t altData;
-        altData.signal_rate = alt_obj["sigrt"].get<double>();
-        altData.ambient_rate = alt_obj["ambrt"].get<double>();
-        altData.sigma_mm = alt_obj["sigma"].get<double>();
-        altData.eff_spad_count = alt_obj["spad"].get<double>()/256.0; // divide by 256 for real value
-        altData.range_mm = alt_obj["range"].get<int>();
-        altData.timeEsp_ms = alt_obj["time"].get<int>();
-        altData.status = alt_obj["status"].get<int>();
-        altData.timePc_ms = time_elapsed_ms();
+    // if(alt_obj.contains("sigrt") && alt_obj.contains("ambrt") && alt_obj.contains("sigma")
+    //         && alt_obj.contains("spad") && alt_obj.contains("range") && alt_obj.contains("time")
+    //         && alt_obj.contains("status") )
+    // {
+    //     RangingData_t altData;
+    //     altData.signal_rate = alt_obj["sigrt"].get<double>();
+    //     altData.ambient_rate = alt_obj["ambrt"].get<double>();
+    //     altData.sigma_mm = alt_obj["sigma"].get<double>();
+    //     altData.eff_spad_count = alt_obj["spad"].get<double>()/256.0; // divide by 256 for real value
+    //     altData.range_mm = alt_obj["range"].get<int>();
+    //     altData.timeEsp_ms = alt_obj["time"].get<int>();
+    //     altData.status = alt_obj["status"].get<int>();
+    //     altData.timePc_ms = time_elapsed_ms();
 
-        // Update state estimate
-        alt_estimator->addRangeMeasurement(altData);
-        AltState_t estimatedState = alt_estimator->getStateEstimate();
+    //     // Update state estimate
+    //     alt_estimator->addRangeMeasurement(altData);
+    //     AltState_t estimatedState = alt_estimator->getStateEstimate();
 
-        // Update controller
-        if(controller_activity) {
-            alt_controller->addEstState(estimatedState);
-        }
+    //     // Update controller
+    //     if(controller_activity) {
+    //         alt_controller->addEstState(estimatedState);
+    //     }
 
-    }
-    else 
-    {
-        pub_log_check("Invalid alt packet", ERROR, true);
+    // }
+    // else 
+    // {
+    //     pub_log_check("Invalid alt packet", LL_ERROR, true);
+    // }
+
+    // if(altData.length() != 22) {
+    //     pub_log_check("Invalid alt packet", LL_ERROR, true);
+    //     return;
+    // }
+
+    mod_VL53L1_RangingMeasurementData_t rawData = {0, 0, 0, 0, 0, 0, 0, 0};
+    rawData.TimeStamp = (std::uint32_t)altData.at(0) | (std::uint32_t)altData.at(1) << 8 | (std::uint32_t)altData.at(2) << 16 | (std::uint32_t)altData.at(3) << 24;
+    rawData.StreamCount = (std::uint8_t)altData.at(4);
+    rawData.SignalRateRtnMegaCps = (FixPoint1616_t)altData.at(5) | (FixPoint1616_t)altData.at(6) << 8 | (FixPoint1616_t)altData.at(7) << 16 | (FixPoint1616_t)altData.at(8) << 24;
+    rawData.AmbientRateRtnMegaCps = (FixPoint1616_t)altData.at(9) | (FixPoint1616_t)altData.at(10) << 8 | (FixPoint1616_t)altData.at(11) << 16 | (FixPoint1616_t)altData.at(12) << 24;
+    rawData.EffectiveSpadRtnCount = (std::uint16_t)altData.at(13) | (std::uint16_t)altData.at(14) << 8;
+    rawData.SigmaMilliMeter = (FixPoint1616_t)altData.at(15) | (FixPoint1616_t)altData.at(16) << 8 | (FixPoint1616_t)altData.at(17) << 16 | (FixPoint1616_t)altData.at(18) << 24;
+    rawData.RangeMilliMeter = (std::int16_t)altData.at(19) | (std::int16_t)altData.at(20) << 8;
+    rawData.RangeStatus = (std::uint8_t)altData.at(21);
+
+    RangingData_t convData;
+    convData.timeEsp_ms = (long int) rawData.TimeStamp;
+    convData.timePc_ms = (long int) time_elapsed_ms();
+    convData.signal_rate = rawData.SignalRateRtnMegaCps/65336.0;
+    convData.ambient_rate = rawData.AmbientRateRtnMegaCps/65336.0;
+    convData.eff_spad_count = rawData.EffectiveSpadRtnCount/256.0;
+    convData.sigma_mm = rawData.SigmaMilliMeter/65336.0;
+    convData.range_mm = rawData.RangeMilliMeter;
+    convData.status = rawData.RangeStatus;
+
+    // Update state estimate
+    alt_estimator->addRangeMeasurement(convData);
+    AltState_t estimatedState = alt_estimator->getStateEstimate();
+
+    // Update controller
+    if(controller_activity) {
+        alt_controller->addEstState(estimatedState);
     }
 
 }
@@ -408,11 +541,11 @@ int Conductor::value_to_tx_range(double value)
 {
     if (value > MAX_CHANNEL_VALUE) {
         value = MAX_CHANNEL_VALUE;
-        pub_log_check("channel value out of range (greater)", WARN, true);
+        pub_log_check("channel value out of range (greater)", LL_WARN, true);
     }
     else if (value < MIN_CHANNEL_VALUE) {
         value = MIN_CHANNEL_VALUE;
-        pub_log_check("channel value out of range (lower)", WARN, true);
+        pub_log_check("channel value out of range (lower)", LL_WARN, true);
     }
 
     return round(value*6 + 1500); // Scaled from (-100, 100) to (900, 2100)
@@ -434,38 +567,38 @@ double Conductor::saturate(double channel_value)
 // Mode
 // **********************************************************
 
-void Conductor::parse_mode(const json &mode_obj)
-{
-    if(mode_obj["mode"].get<int>() == 1) { // TODO: change to enum
-        set_controller_activity(true);
-        pub_log_check("Controller started", INFO, true);
-    }
-    else if(mode_obj["mode"].get<int>() == 2) { // TODO: change to enum
-        set_controller_activity(false);
-        pub_log_check("Controller stopped", INFO, true);
-    }
+// void Conductor::parse_mode(const json &mode_obj)
+// {
+//     if(mode_obj["mode"].get<int>() == 1) { // TODO: change to enum
+//         set_controller_activity(true);
+//         pub_log_check("Controller started", LL_INFO, true);
+//     }
+//     else if(mode_obj["mode"].get<int>() == 2) { // TODO: change to enum
+//         set_controller_activity(false);
+//         pub_log_check("Controller stopped", LL_INFO, true);
+//     }
 
-    if(mode_obj["rsp"] == "true") {
-        send_mode(controller_activity);
-    }
+//     if(mode_obj["rsp"] == "true") {
+//         send_mode(controller_activity);
+//     }
 
-}
+// }
 
-void Conductor::parse_landing(const json &land_obj)
-{
-    if(land_obj["land"].get<int>() == 1) { // TODO: change to enum
-        set_landing(true);
-        pub_log_check("Landing started", INFO, true);
-    }
-    else if(land_obj["land"].get<int>() == 2) { // TODO: change to enum
-        set_landing(false);
-        pub_log_check("Landing stopped", INFO, true);
-    }
+// void Conductor::parse_landing(const json &land_obj)
+// {
+//     if(land_obj["land"].get<int>() == 1) { // TODO: change to enum
+//         set_landing(true);
+//         pub_log_check("Landing started", LL_INFO, true);
+//     }
+//     else if(land_obj["land"].get<int>() == 2) { // TODO: change to enum
+//         set_landing(false);
+//         pub_log_check("Landing stopped", LL_INFO, true);
+//     }
 
-    if(land_obj["rsp"] == "true") {
-        send_landing(landing);
-    }
-}
+//     if(land_obj["rsp"] == "true") {
+//         send_landing(landing);
+//     }
+// }
 
 void Conductor::set_controller_activity(const bool is_active)
 {
@@ -493,28 +626,32 @@ void Conductor::set_landing(bool is_landing)
 
 void Conductor::send_mode(const bool active)
 {
-    json send_doc;
-    send_doc["snd"] = "jv";
-    send_doc["dst"] = "pc";
-    send_doc["typ"] = "mode";
-    send_doc["mode"] = active ? 1 : 2; // TODO: change to enum
+    // json send_doc;
+    // send_doc["snd"] = "jv";
+    // send_doc["dst"] = "pc";
+    // send_doc["typ"] = "mode";
+    // send_doc["mode"] = active ? 1 : 2; // TODO: change to enum
 
-    // Echo the json packet
-    std::string s = send_doc.dump();    
-    send_payload(s);
+    // // Echo the json packet
+    // std::string s = send_doc.dump();
+
+    std::vector<char> send_data = { SRC_JV, DST_PC, MID_MODE, RSP_FALSE, active ? JV_CTRL_ENA : JV_CTRL_DIS};
+    send_payload(send_data);
 }
 
 void Conductor::send_landing(const bool active)
 {
-    json send_doc;
-    send_doc["snd"] = "jv";
-    send_doc["dst"] = "pc";
-    send_doc["typ"] = "land";
-    send_doc["land"] = active ? 1 : 2; // TODO: change to enum
+    // json send_doc;
+    // send_doc["snd"] = "jv";
+    // send_doc["dst"] = "pc";
+    // send_doc["typ"] = "land";
+    // send_doc["land"] = active ? 1 : 2; // TODO: change to enum
 
-    // Echo the json packet
-    std::string s = send_doc.dump();
-    send_payload(s);
+    // // Echo the json packet
+    // std::string s = send_doc.dump();
+
+    std::vector<char> send_data = { SRC_JV, DST_PC, MID_LAND, RSP_FALSE, active ? JV_LAND_ENA : JV_LAND_DIS};
+    send_payload(send_data);
 
 }
 
@@ -522,9 +659,9 @@ void Conductor::send_landing(const bool active)
 // Send Timer
 // **********************************************************
 
-int Conductor::time_elapsed_ms()
+long int Conductor::time_elapsed_ms()
 {
-    return (int)std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start_time_jv).count();
+    return (long int)std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start_time_jv).count();
 }
 
 void Conductor::timer_handler(const boost::system::error_code& error)
@@ -539,7 +676,7 @@ void Conductor::timer_handler(const boost::system::error_code& error)
     if(!error)
     {
 
-        pub_log_check("Send timer", DEBUG, true);
+        pub_log_check("Send timer", LL_DEBUG, true);
 
         if(!sent_initial) {
             send_mode(controller_activity);
@@ -552,7 +689,8 @@ void Conductor::timer_handler(const boost::system::error_code& error)
             if(landing) {
                 AltTarget_t targetTemp;
                 if(alt_controller->getTarget(targetTemp)) {
-                    targetTemp.z += 0.1*((double)CONTROL_LOOP_PERIOD_MS)/1000.0; targetTemp.z_dot = 0.1;
+                    targetTemp.z += 0.1*((double)CONTROL_LOOP_PERIOD_MS)/1000.0;
+                    targetTemp.z_dot = 0.1;
                     targetTemp.z = targetTemp.z > 0.0 ? targetTemp.z : 0.0;
                     alt_controller->setTarget(targetTemp);
                 }
@@ -620,14 +758,18 @@ void Conductor::send_channels(const std::array<double, 16> &channels, const bool
     msp_data.push_back(checksum);
 
     // Hard-code json
-    std::string pre_string = "{\"snd\":\"pc\",\"dst\":\"fc\",\"typ\":\"msp\",\"rsp\":";
-    pre_string += response ? "\"true\"" : "\"false\"";
-    pre_string += ",\"ctrl\":\"true\",\"msp\":\"";
-    std::string post_string = "\"}";
+    // std::string pre_string = "{\"snd\":\"pc\",\"dst\":\"fc\",\"typ\":\"msp\",\"rsp\":";
+    // pre_string += response ? "\"true\"" : "\"false\"";
+    // pre_string += ",\"ctrl\":\"true\",\"msp\":\"";
+    // std::string post_string = "\"}";
 
-    std::vector<char> all_data(pre_string.begin(), pre_string.end());
+    // std::vector<char> all_data(pre_string.begin(), pre_string.end());
+    // all_data.insert(all_data.end(), msp_data.begin(), msp_data.end());
+    // all_data.insert(all_data.end(), post_string.begin(), post_string.end());
+
+    // Insert msp data into a new vector. Not the most efficient way, but more portable
+    std::vector<char> all_data = {SRC_JV, DST_FC, MID_MSP, response ? RSP_TRUE : RSP_FALSE};
     all_data.insert(all_data.end(), msp_data.begin(), msp_data.end());
-    all_data.insert(all_data.end(), post_string.begin(), post_string.end());
 
     // Write to serial
     send_payload(all_data);
@@ -640,13 +782,13 @@ void Conductor::pub_log_check(const std::string &in_str, int log_level, bool sen
 {
     if(log_level >= GLOBAL_LOG_LEVEL) {
         std::string lvl_str = "[]";
-        if(log_level == ALL) { lvl_str = "[ALL] "; }
-            else if(log_level == DEBUG) { lvl_str = "[DEBUG] "; }
-            else if(log_level == INFO) { lvl_str = "[INFO] "; }
-            else if(log_level == WARN) { lvl_str = "[WARN] "; }
-            else if(log_level == ERROR) { lvl_str = "[ERROR] "; }
-            else if(log_level == FATAL) { lvl_str = "[FATAL] "; }
-            else if(log_level == OFF) { lvl_str = "[OFF] "; }
+        if(log_level == LL_ALL) { lvl_str = "[ALL] "; }
+            else if(log_level == LL_DEBUG) { lvl_str = "[DEBUG] "; }
+            else if(log_level == LL_INFO) { lvl_str = "[INFO] "; }
+            else if(log_level == LL_WARN) { lvl_str = "[WARN] "; }
+            else if(log_level == LL_ERROR) { lvl_str = "[ERROR] "; }
+            else if(log_level == LL_FATAL) { lvl_str = "[FATAL] "; }
+            else if(log_level == LL_OFF) { lvl_str = "[OFF] "; }
 
         if(file_log.is_open())
             file_log << lvl_str << in_str << std::endl;
@@ -659,15 +801,15 @@ void Conductor::send_log(const std::string &in_str, int log_level)
 {
     
     json send_doc;
-    send_doc["snd"] = "jv";
-    send_doc["dst"] = "pc";
     send_doc["typ"] = "log";
     send_doc["lvl"] = log_level;
     send_doc["log"] = in_str;
 
-    // Echo the json packet
     std::string s = send_doc.dump();
-    send_payload(s);
+    std::vector<char> all_data = {SRC_JV, DST_PC, MID_JSON, RSP_FALSE};
+    all_data.insert(all_data.end(), s.begin(), s.end());
+
+    send_payload(all_data);
 
 }
 
