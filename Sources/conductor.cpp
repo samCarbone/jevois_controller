@@ -343,7 +343,10 @@ void Conductor::parse_packet(const std::vector<char> &inVec)
 
     // }
 
-    if(inVec.size()<4) { return; }
+    if(inVec.size()<4) {
+        pub_log_check("Packet len<4", LL_ERROR, true);
+        return;
+    }
     char src = inVec.at(0);
     char dst = inVec.at(1);
     char mid = inVec.at(2);
@@ -363,6 +366,8 @@ void Conductor::parse_packet(const std::vector<char> &inVec)
         
     }
     else if(src == SRC_PC) {
+        pub_log_check("SRC PC", LL_DEBUG, true);
+
         if(mid == MID_MODE && inVec.size() == 5) {
             if(inVec.at(4) == JV_CTRL_ENA) {
                 set_controller_activity(true);
