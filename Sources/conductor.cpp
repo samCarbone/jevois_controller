@@ -357,7 +357,7 @@ void Conductor::parse_packet(const std::vector<char> &inVec)
     if(src == SRC_ESP) {
 
         if(mid == MID_ALT) {
-            std::vector<unsigned char> alt_data(inVec.begin()+4, inVec.end())
+            std::vector<unsigned char> alt_data(inVec.begin()+4, inVec.end());
             parse_altitude(alt_data);
         }
         
@@ -391,7 +391,7 @@ void Conductor::parse_packet(const std::vector<char> &inVec)
                 send_landing(landing);
             }  
         }
-        else if(mid == MID_QUIT %% inVec.size() == 5) {
+        else if(mid == MID_QUIT && inVec.size() == 5) {
             if(inVec.at(4) == JV_QUIT_TRUE) {
                 set_controller_activity(false);
                 pub_log_check("Quit", LL_INFO, true); // Might not send

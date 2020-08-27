@@ -51,6 +51,7 @@ typedef struct {
 #define	VL53L1_RANGESTATUS_RANGE_INVALID			14          /*!<lld returned valid range but negative value ! */
 #define	 VL53L1_RANGESTATUS_NONE				255             /*!<No Update. */
 
+typedef std::uint32_t FixPoint1616_t;
 
 typedef struct {
     std::uint32_t TimeStamp;

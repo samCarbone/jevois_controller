@@ -25,10 +25,9 @@
 
 using json = nlohmann::json;
 
-enum log_levels { ALL, DEBUG, INFO, WARN, ERROR, FATAL, OFF };
 enum msg_type {IDLE_W, SOF_A, LEN_LO, PAYLOAD, CRC_HI, CRC_LO, VALID};
 
-const int GLOBAL_LOG_LEVEL = INFO;
+const int GLOBAL_LOG_LEVEL = LL_INFO;
 
 class Conductor
 {
