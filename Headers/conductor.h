@@ -85,7 +85,7 @@ private:
     // Comms
     void send_channels(const std::array<double, 16> &channels, const bool response=false);
     // bool find_first_json(const std::vector<char> &inVec, int &start, int &end);
-    bool find_first_msp(const std::vector<char> &inVec, int &start, int &end);
+    // bool find_first_msp(const std::vector<char> &inVec, int &start, int &end);
     void parse_packet(const std::vector<char> &inVec);
     // void parse_mode(const json &mode_obj);
     // void parse_landing(const json &land_obj);

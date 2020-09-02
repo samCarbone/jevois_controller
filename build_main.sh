@@ -3,7 +3,5 @@
 sudo rm -rf pbuild \
 	&& mkdir pbuild \
 	&& cd pbuild \
-	&& cmake .. \
+	&& cmake -DJEVOIS_PLATFORM=ON .. \
 	&& make
-
-

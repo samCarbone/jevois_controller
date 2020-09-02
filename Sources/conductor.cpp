@@ -187,70 +187,70 @@ void Conductor::send_payload(const std::string &data_str) {
 }
 
 // [start, end] --> [", "]
-bool Conductor::find_first_msp(const std::vector<char> &inVec, int &start, int &end)
-{
+// bool Conductor::find_first_msp(const std::vector<char> &inVec, int &start, int &end)
+// {
 
-    const std::array<char, 2> chrs_option_1 = {'{',','};
-    const std::array<char, 7> chrs_2 = {'\"', 'm', 's','p','\"',':','\"'};
-    bool found_start = false;
-    const char chr_3 = '\"';
-    const std::array<char, 2> chrs_option_4 = {',','}'};
-    start = 0;
-    end = 0;
-    int expected_end = 0;
-    const int min_msp_len = 6;
+//     const std::array<char, 2> chrs_option_1 = {'{',','};
+//     const std::array<char, 7> chrs_2 = {'\"', 'm', 's','p','\"',':','\"'};
+//     bool found_start = false;
+//     const char chr_3 = '\"';
+//     const std::array<char, 2> chrs_option_4 = {',','}'};
+//     start = 0;
+//     end = 0;
+//     int expected_end = 0;
+//     const int min_msp_len = 6;
 
-    // Find the start
-    for(int i=0; i<(int)inVec.size()-(int)chrs_2.size()-2-min_msp_len; i++) {
+//     // Find the start
+//     for(int i=0; i<(int)inVec.size()-(int)chrs_2.size()-2-min_msp_len; i++) {
 
-        // Check for the first character
-        // one OR the other
-        for(auto &opt : chrs_option_1) {
-            if(inVec.at(i) == opt) {
-                found_start = true;
-                break;
-            }
-        }
-        if(!found_start)
-            continue;
+//         // Check for the first character
+//         // one OR the other
+//         for(auto &opt : chrs_option_1) {
+//             if(inVec.at(i) == opt) {
+//                 found_start = true;
+//                 break;
+//             }
+//         }
+//         if(!found_start)
+//             continue;
 
-        // Check for the next sequence of characters
-        for(int j=0; j<chrs_2.size(); j++) {
+//         // Check for the next sequence of characters
+//         for(int j=0; j<chrs_2.size(); j++) {
 
-            if(inVec.at(i+1+j) != chrs_2.at(j)) {
-                found_start = false;
-                break;
-            }
+//             if(inVec.at(i+1+j) != chrs_2.at(j)) {
+//                 found_start = false;
+//                 break;
+//             }
 
-        }
+//         }
 
-        if(found_start) {
-            start = i+chrs_2.size();
-            // the msp message length is read and used to find the end
-            unsigned char message_len = static_cast<unsigned char>(inVec.at(start+4));
-            expected_end = start + min_msp_len + static_cast<int>(message_len) + 1;
-            break;
-        }
+//         if(found_start) {
+//             start = i+chrs_2.size();
+//             // the msp message length is read and used to find the end
+//             unsigned char message_len = static_cast<unsigned char>(inVec.at(start+4));
+//             expected_end = start + min_msp_len + static_cast<int>(message_len) + 1;
+//             break;
+//         }
 
-    }
+//     }
 
-    if(found_start && expected_end < (int)inVec.size()-1) {
+//     if(found_start && expected_end < (int)inVec.size()-1) {
 
-        if(inVec.at(expected_end) != chr_3)
-            return false;
+//         if(inVec.at(expected_end) != chr_3)
+//             return false;
 
-        for(auto &opt: chrs_option_4) {
-            if(inVec.at(expected_end+1) == opt) {
-                end = expected_end;
-                return true;
-            }
-        }
+//         for(auto &opt: chrs_option_4) {
+//             if(inVec.at(expected_end+1) == opt) {
+//                 end = expected_end;
+//                 return true;
+//             }
+//         }
 
-    }
+//     }
 
-    return false;
+//     return false;
 
-}
+// }
 
 // [{, }]
 void Conductor::parse_packet(const std::vector<char> &inVec)
@@ -495,10 +495,10 @@ void Conductor::parse_altitude(const std::vector<unsigned char> &altData)
     //     pub_log_check("Invalid alt packet", LL_ERROR, true);
     // }
 
-    // if(altData.length() != 22) {
-    //     pub_log_check("Invalid alt packet", LL_ERROR, true);
-    //     return;
-    // }
+    if(altData.length() != 22) {
+        pub_log_check("Invalid alt packet", LL_ERROR, true);
+        return;
+    }
 
     mod_VL53L1_RangingMeasurementData_t rawData = {0, 0, 0, 0, 0, 0, 0, 0};
     rawData.TimeStamp = (std::uint32_t)altData.at(0) | (std::uint32_t)altData.at(1) << 8 | (std::uint32_t)altData.at(2) << 16 | (std::uint32_t)altData.at(3) << 24;

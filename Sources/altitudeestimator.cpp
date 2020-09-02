@@ -68,7 +68,7 @@ void AltitudeEstimator::addRangeMeasurement(RangingData_t rangeData)
     try {
         P = F*P*F.inverse() + Q;
     } catch(const std::exception& e) {
-        std::cout << e.what();
+        std::cerr << e.what();
     }
 
     // Measurement update

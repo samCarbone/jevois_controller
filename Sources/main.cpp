@@ -11,7 +11,7 @@
 #include "conductor.h"
 #include <string>
 
-int main(int argc, char*argv[])
+int main(int argc, char* argv[])
 {
 
     // /* 
@@ -76,6 +76,12 @@ int main(int argc, char*argv[])
     // }
 
     std::string file_name = "/dev/ttyS0";
+    if(argc >= 3) {
+        if(strcmp(argv[2], "-f") == 0) {
+            file_name.assign(argv[3]);
+        }
+    }
+    
     unsigned int baud_rate = 57600;
     Conductor *my_object = new Conductor(file_name, baud_rate);
 
