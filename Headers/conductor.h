@@ -59,13 +59,15 @@ private:
 
 
     // Channels
-    const double MAX_CHANNEL_VALUE = 100;
-    const double MIN_CHANNEL_VALUE = -100;
+    static constexpr double MAX_CHANNEL_VALUE = 100;
+    static constexpr double MIN_CHANNEL_VALUE = -100;
+    const double MAX_THROTTLE = 0;
     const unsigned char MSP_CHANNEL_ID = 200;
     std::array<double, 4> controller_channels = {0, 0, 0, 0};
+    // 0->ail, 1->ele, 2->thr, 3->rud, 4->arm
     double get_controller_channel_value(const int channel);
     int value_to_tx_range(double value);
-    double saturate(double channelValue);
+    double saturate(double channelValue, const double MIN=MIN_CHANNEL_VALUE, const double MAX=MAX_CHANNEL_VALUE);
 
     // Mode
     bool controller_activity = false;
@@ -127,7 +129,7 @@ private:
     std::string prefix_log = "log_";
     // control signals
     std::ofstream file_sig;
-    std::string header_sig = "time_esp_ms,time_esp_prop,Delta_t_prop_ms,z_prop,z_dot_prop,chnThr,chnEle,chnAil,chnRud";
+    std::string header_sig = "time_esp_ms,time_esp_prop,Delta_t_prop_ms,time_pc_ms,z_prop,z_dot_prop,chnThr,chnEle,chnAil,chnRud";
     std::string prefix_sig = "alt_prop_ctrl_";
     
 

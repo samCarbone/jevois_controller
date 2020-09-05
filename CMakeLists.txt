@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.10)
+cmake_minimum_required(VERSION 3.12.4)
 
 option(JEVOIS_PLATFORM "Build for jevois platform" OFF)
 
@@ -17,17 +17,20 @@ set(HOST_CFLAGS " -fPIC -Wno-deprecated-declarations -Wno-psabi ")
 set(CMAKE_SYSTEM_NAME Linux)
 if(JEVOIS_PLATFORM)
     set(CMAKE_SYSTEM_PROCESSOR arm)
-    set(CMAKE_C_COMPILER ${PLATFORM_C_COMPILER})
-    set(CMAKE_CXX_COMPILER ${PLATFORM_CXX_COMPILER})
+    set(CMAKE_C_COMPILER ${JEVOIS_PLATFORM_C_COMPILER})
+    set(CMAKE_CXX_COMPILER ${JEVOIS_PLATFORM_CXX_COMPILER})
     set(CMAKE_C_FLAGS "-std=gnu99 -W -Wno-attribute-warning ${JEVOIS_PLATFORM_ARCH_FLAGS} ${JEVOIS_PLATFORM_CFLAGS}")
     set(CMAKE_CXX_FLAGS " -W -Wno-attribute-warning ${JEVOIS_PLATFORM_ARCH_FLAGS} ${JEVOIS_PLATFORM_CFLAGS}")
     set(BOOST_LIBRARIES, "/usr/share/jevois-sdk/out/sun8iw5p1/linux/common/buildroot/host/arm-buildroot-linux-gnueabihf/sysroot/usr/include/boost")
+    message(STATUS "Compiling for Jevois platform")
 else()
     set(CMAKE_C_COMPILER ${HOST_C_COMPILER})
     set(CMAKE_CXX_COMPILER ${HOST_CXX_COMPILER})
     set(CMAKE_C_FLAGS "-std=gnu99 -W -Wno-attribute-warning ${HOST_ARCH_FLAGS} ${HOST_CFLAGS}")
     set(CMAKE_CXX_FLAGS " -W -Wno-attribute-warning ${HOST_ARCH_FLAGS} ${HOST_CFLAGS}")
     set(BOOST_LIBRARIES, "usr/include/boost")
+    message(STATUS "Compiling for host")
+    add_compile_definitions(IS_HOST)
 endif()
 
 # specify the C++ standard
@@ -35,7 +38,7 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
 
 # set the project name and version
-project(Conductor VERSION 0.1)
+project(Conductor VERSION 0.1 LANGUAGES C CXX)
 
 # add the sources subdirectory
 INCLUDE_DIRECTORIES(Sources)

@@ -18,7 +18,7 @@ public:
     void addRangeMeasurement(RangingData_t rangeData);
     AltState_t getStateEstimate();
     AltState_t getPropagatedStateEstimate(long int newTimePc_ms);
-    AltState_t getPropagatedStateEstimate_safe(long int newTimePc_ms, long int limitDelta_ms);
+    AltState_t getPropagatedStateEstimate_safe(long int newTimePc_ms, long int limitDelta_ms, bool &error, std::string &error_str);
     long int getCurrentTimePc_ms();
     long int getCurrentTimeEsp_ms();
 

@@ -36,8 +36,15 @@ Conductor::Conductor(std::string serial_port_name, unsigned int baud_rate)
     alt_estimator = new AltitudeEstimator();
 
     // Open files - allow for immediate recording
+    #ifndef IS_HOST
     set_file_suffix("jv");
     set_file_directory("/jevois/scripts/logs");
+    #endif
+    #ifdef IS_HOST
+    set_file_suffix("jv");
+    set_file_directory("/home/samuel/Documents/host_logs");
+    #endif
+
     open_files();
 
     pub_log_check("Started", LL_INFO, true);
@@ -80,6 +87,12 @@ void Conductor::serial_read_handler(const boost::system::error_code& error, std:
                 if(serial_read_buffer.at(read_idx) == '#') {
                     recv_state = SOF_A;
                 }
+                else {
+                    std::cerr << serial_read_buffer.at(read_idx);
+                    #ifdef IS_HOST
+                    std::cout << serial_read_buffer.at(read_idx);
+                    #endif
+                }
                 read_idx++;
             }
             
@@ -92,6 +105,10 @@ void Conductor::serial_read_handler(const boost::system::error_code& error, std:
                 }
                 else {
                     recv_state = IDLE_W;
+                    std::cerr << serial_read_buffer.at(read_idx);
+                    #ifdef IS_HOST
+                    std::cout << serial_read_buffer.at(read_idx);
+                    #endif
                 }
                 read_idx++;
             }
@@ -371,11 +388,9 @@ void Conductor::parse_packet(const std::vector<char> &inVec)
         if(mid == MID_MODE && inVec.size() == 5) {
             if(inVec.at(4) == JV_CTRL_ENA) {
                 set_controller_activity(true);
-                pub_log_check("Controller started", LL_INFO, true);
             }
             else if(inVec.at(4) == JV_CTRL_DIS) {
                 set_controller_activity(false);
-                pub_log_check("Controller stopped", LL_INFO, true);
             }
 
             if(rsp == RSP_TRUE) {
@@ -385,11 +400,9 @@ void Conductor::parse_packet(const std::vector<char> &inVec)
         else if(mid == MID_LAND && inVec.size() == 5) {
             if(inVec.at(4) == JV_LAND_ENA) {
                 set_landing(true);
-                pub_log_check("Landing started", LL_INFO, true);
             }
             else if(inVec.at(4) == JV_LAND_DIS) {
                 set_landing(false);
-                pub_log_check("Landing stopped", LL_INFO, true);
             }
 
             if(rsp == RSP_TRUE) {
@@ -495,7 +508,7 @@ void Conductor::parse_altitude(const std::vector<unsigned char> &altData)
     //     pub_log_check("Invalid alt packet", LL_ERROR, true);
     // }
 
-    if(altData.length() != 22) {
+    if(altData.size() != 22) {
         pub_log_check("Invalid alt packet", LL_ERROR, true);
         return;
     }
@@ -519,6 +532,13 @@ void Conductor::parse_altitude(const std::vector<unsigned char> &altData)
     convData.sigma_mm = rawData.SigmaMilliMeter/65336.0;
     convData.range_mm = rawData.RangeMilliMeter;
     convData.status = rawData.RangeStatus;
+
+    // #ifdef IS_HOST
+    // std::cout << "Time esp: " << convData.timeEsp_ms
+    //             << ", Time pc: " << convData.timePc_ms
+    //             << ", sigma_mm: " << convData.sigma_mm
+    //             << ", range_mm: " << convData.range_mm << std::endl;
+    // #endif
 
     // Update state estimate
     alt_estimator->addRangeMeasurement(convData);
@@ -556,13 +576,13 @@ int Conductor::value_to_tx_range(double value)
     return round(value*6 + 1500); // Scaled from (-100, 100) to (900, 2100)
 }
 
-double Conductor::saturate(double channel_value)
+double Conductor::saturate(double channel_value, const double MIN, const double MAX)
 {
-    if (channel_value > MAX_CHANNEL_VALUE) {
-        channel_value = MAX_CHANNEL_VALUE;
+    if (channel_value > MAX) {
+        channel_value = MAX;
     }
-    else if (channel_value < MIN_CHANNEL_VALUE) {
-        channel_value = MIN_CHANNEL_VALUE;
+    else if (channel_value < MIN) {
+        channel_value = MIN;
     }
     return channel_value;
 }
@@ -607,14 +627,26 @@ double Conductor::saturate(double channel_value)
 
 void Conductor::set_controller_activity(const bool is_active)
 {
-    landing = false;
-    controller_activity = is_active;
-    alt_controller->resetState();
 
-    if(is_active) {
-        // Make a better way of setting the target
-        AltTarget_t targetTemp; targetTemp.z = -0.5; targetTemp.z_dot = 0;
-        alt_controller->setTarget(targetTemp);
+    if(is_active != controller_activity) {
+
+        landing = false;
+        controller_activity = is_active;
+        alt_controller->resetState();
+
+        if(is_active) {
+            // Make a better way of setting the target
+            AltTarget_t targetTemp; targetTemp.z = -0.5; targetTemp.z_dot = 0;
+            alt_controller->setTarget(targetTemp);
+            // Close/reopen files to reprint each of the headers
+            close_files();
+            open_files();
+            pub_log_check("Controller started", LL_INFO, true);
+        }
+        else {
+            pub_log_check("Controller stopped", LL_INFO, true);
+        }
+
     }
 
 }
@@ -626,7 +658,15 @@ bool Conductor::get_controller_activity()
 
 void Conductor::set_landing(bool is_landing)
 {
-    landing = is_landing;
+    if(landing != is_landing) {
+        landing = is_landing;
+        if(landing) {
+            pub_log_check("Landing started", LL_INFO, true);
+        }
+        else {
+            pub_log_check("Landing stopped", LL_INFO, true);
+        }
+    }
 }
 
 void Conductor::send_mode(const bool active)
@@ -701,18 +741,39 @@ void Conductor::timer_handler(const boost::system::error_code& error)
                 }
             }
 
-            double chn_thr, chn_ele, chn_ail, chn_rud;
-            AltState_t prop_alt_state = alt_estimator->getPropagatedStateEstimate_safe(time_elapsed_ms(), PROP_LIMIT);
-            chn_thr = saturate(alt_controller->getControlTempState(prop_alt_state));
+
+            double chn_thr = -100;
+            double chn_ele = 0;
+            double chn_ail = 0;
+            double chn_rud = 0;
+            bool error = false;
+            std::string error_str  = "";
+            long int current_pc_time_ms = time_elapsed_ms();
+            AltState_t prop_alt_state = alt_estimator->getPropagatedStateEstimate_safe(current_pc_time_ms, PROP_LIMIT, error, error_str);
+            chn_thr = saturate(alt_controller->getControlTempState(prop_alt_state), MIN_CHANNEL_VALUE, MAX_THROTTLE);
             // TODO: find a way to not set the arm channel
-            std::array<double, 16> mixed_channels = {0, 0, chn_thr, 0, 100, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+            // 0->ail, 1->ele, 2->thr, 3->rud, 4->arm
+            std::array<double, 16> mixed_channels = {chn_ail, chn_ele, chn_thr, chn_rud, 100, -100, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
             send_channels(mixed_channels, false);
+
+            if(error) {
+                pub_log_check(error_str, LL_ERROR, true);
+            }
+
+            #ifdef IS_HOST
+            std::cout << "Prop-> Time esp: " << prop_alt_state.timeEsp_ms
+                        << ", Time pc: " << prop_alt_state.timePc_ms
+                        << std::fixed << std::setprecision(4) << ", z: " << prop_alt_state.z
+                        << ", \tz_dot: " << prop_alt_state.z_dot;
+            std::cout   << ",  \tchn_thr: " << chn_thr
+                        << std::endl;
+            #endif
 
             if(files_open) {
                 // header
-                // "time_esp_ms,time_esp_prop,Delta_t_prop_ms,z_prop,z_dot_prop,chnThr,chnEle,chnAil,chnRud"
+                // "time_esp_ms,time_esp_prop,Delta_t_prop_ms,time_pc_ms,z_prop,z_dot_prop,chnThr,chnEle,chnAil,chnRud"
                 file_sig << alt_estimator->getCurrentTimeEsp_ms() << "," << prop_alt_state.timeEsp_ms << "," << prop_alt_state.timeEsp_ms-alt_estimator->getCurrentTimeEsp_ms() << ","
-                         << prop_alt_state.z << "," << prop_alt_state.z_dot << "," << chn_thr << "," << chn_ele << "," << chn_ail << "," << chn_rud << std::endl;
+                         << current_pc_time_ms << prop_alt_state.z << "," << prop_alt_state.z_dot << "," << chn_thr << "," << chn_ele << "," << chn_ail << "," << chn_rud << std::endl;
             }
 
         }
@@ -757,7 +818,7 @@ void Conductor::send_channels(const std::array<double, 16> &channels, const bool
 
     // Checksum
     char checksum = message_len ^ message_id;
-    for(int i=5; i < msp_data.size(); i++) {
+    for(unsigned int i=5; i < msp_data.size(); i++) {
         checksum ^= msp_data.at(i);
     } 
     msp_data.push_back(checksum);

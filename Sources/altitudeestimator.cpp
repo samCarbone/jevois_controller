@@ -13,7 +13,8 @@ AltitudeEstimator::~AltitudeEstimator()
 void AltitudeEstimator::resetStateEstimate()
 {
     // TODO: move x_0 and P_0 into header file
-    x.fill(0);
+    // x.fill(0);
+    x << 0, 0;
     P << 1, 1,
          1, 1;
     hasPreviousMeasurement = false;
@@ -30,7 +31,7 @@ void AltitudeEstimator::addRangeMeasurement(RangingData_t rangeData)
         */
         x(0,0) = -rangeData.range_mm/1000.0;
         x(1,0) = 0;
-        currentTimePc_ms = rangeData.timeEsp_ms;
+        currentTimeEsp_ms = rangeData.timeEsp_ms;
         currentTimePc_ms = rangeData.timePc_ms;
         hasPreviousMeasurement = true;
         return;
@@ -40,6 +41,12 @@ void AltitudeEstimator::addRangeMeasurement(RangingData_t rangeData)
     double Delta_t = (rangeData.timeEsp_ms - currentTimeEsp_ms)/1000.0;
     currentTimeEsp_ms = rangeData.timeEsp_ms;
     currentTimePc_ms = rangeData.timePc_ms;
+
+    // If the ESP has restarted, then Delta_t will be negative
+    // Instead set Delta_t to 0
+    if(Delta_t < 0) {
+        Delta_t = 0;
+    }
 
     // State transition
     Eigen::Matrix<double, 2, 2> F;
@@ -141,12 +148,23 @@ AltState_t AltitudeEstimator::getPropagatedStateEstimate(long int newTimePc_ms)
     return stateResult;
 }
 
-AltState_t AltitudeEstimator::getPropagatedStateEstimate_safe(long int newTimePc_ms, long int limitDelta_ms)
+AltState_t AltitudeEstimator::getPropagatedStateEstimate_safe(long int newTimePc_ms, long int limitDelta_ms, bool &error, std::string &error_str)
 {
-    int Delta_t = newTimePc_ms - currentTimePc_ms;
+    error = false;
+    long int Delta_t = newTimePc_ms - currentTimePc_ms;
     if(Delta_t > limitDelta_ms) {
-        std::cout << "[warn] Long forward propagation time: " << Delta_t << "ms" << std::endl;
+        std::ostringstream os;
+        os << "[warn] Long forward propagation time: " << Delta_t << "ms";
+        error_str = os.str();
+        error = true;
         newTimePc_ms = currentTimePc_ms + limitDelta_ms;
+    }
+    else if(Delta_t < 0) {
+        std::ostringstream os;
+        os << "[warn] Negative forward propagation time: " << Delta_t << "ms";
+        error_str = os.str();
+        error = true;
+        newTimePc_ms = currentTimePc_ms;   
     }
 
     return getPropagatedStateEstimate(newTimePc_ms);
