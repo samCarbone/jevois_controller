@@ -8,56 +8,66 @@
 #include <vector>
 #include <array>
 #include <math.h>
+#include <cstdint>
 
 #include <boost/asio.hpp>
-#include <boost/bind.hpp>
+#include <boost/bind/bind.hpp>
 #include <boost/asio/serial_port.hpp>
 #include <boost/asio/high_resolution_timer.hpp>
 #include <boost/date_time/posix_time/posix_time.hpp>
 #include <nlohmann/json.hpp>
+#include <CRC.h>
 
 #include "def.h"
+#include "my_enums.h"
 #include "altitudeestimator.h"
 #include "altitudecontroller.h"
 
 using json = nlohmann::json;
 
-enum log_levels { ALL, DEBUG, INFO, WARN, ERROR, FATAL, OFF };
+enum msg_type {IDLE_W, SOF_A, LEN_LO, PAYLOAD, CRC_HI, CRC_LO, VALID};
 
-const int GLOBAL_LOG_LEVEL = INFO;
+const int GLOBAL_LOG_LEVEL = LL_INFO;
 
 class Conductor
 {
 
 public:
     Conductor();
-    Conductor(std::string serial_port_name);
+    Conductor(std::string serial_port_name, unsigned int baud_rate);
     ~Conductor();        
 
 private:
+
+    // Boost serial
     boost::asio::io_service io;
     boost::asio::serial_port* esp_port;
     void serial_read_handler(const boost::system::error_code& error, std::size_t bytes_transferred);
     void serial_write_handler(const boost::system::error_code& error, std::size_t bytes_transferred);
     std::array<char, 256> serial_read_buffer;
-    std::array<char, 256> serial_write_buffer;
-    std::vector<char> serial_read_concat;
+    std::vector<char> serial_payload;
+    std::size_t payload_len = 0;
+    msg_type recv_state = IDLE_W;
+    std::size_t payload_idx = 0;
+    std::uint8_t cksum_hi = 0;
+    void send_payload(const std::vector<char> &data);
+    void send_payload(const std::string &data_str);
 
-
+    // Boost timer
     void sendTimerDone();
-
-    const int SEND_CONTROL_PERIOD_MS = 1000; // ms, time between sending control commansd
-    const int PROP_LIMIT = 100;
+    const long int PROP_LIMIT = 100;
 
 
     // Channels
-    const double MAX_CHANNEL_VALUE = 100;
-    const double MIN_CHANNEL_VALUE = -100;
+    static constexpr double MAX_CHANNEL_VALUE = 100;
+    static constexpr double MIN_CHANNEL_VALUE = -100;
+    const double MAX_THROTTLE = 0;
     const unsigned char MSP_CHANNEL_ID = 200;
     std::array<double, 4> controller_channels = {0, 0, 0, 0};
+    // 0->ail, 1->ele, 2->thr, 3->rud, 4->arm
     double get_controller_channel_value(const int channel);
     int value_to_tx_range(double value);
-    double saturate(double channelValue);
+    double saturate(double channelValue, const double MIN=MIN_CHANNEL_VALUE, const double MAX=MAX_CHANNEL_VALUE);
 
     // Mode
     bool controller_activity = false;
@@ -72,16 +82,17 @@ private:
     boost::asio::high_resolution_timer* send_timer;
     const long CONTROL_LOOP_PERIOD_MS = 50; // ms
     void timer_handler(const boost::system::error_code& error);
-    int time_elapsed_ms();
+    long int time_elapsed_ms();
 
     // Comms
     void send_channels(const std::array<double, 16> &channels, const bool response=false);
     // bool find_first_json(const std::vector<char> &inVec, int &start, int &end);
-    bool find_first_msp(const std::vector<char> &inVec, int &start, int &end);
-    void parse_packet(const std::vector<char> &inVec, const int start, const int end);
-    void parse_mode(const json &mode_obj);
-    void parse_landing(const json &land_obj);
-    void parse_altitude(const json &alt_obj);
+    // bool find_first_msp(const std::vector<char> &inVec, int &start, int &end);
+    void parse_packet(const std::vector<char> &inVec);
+    // void parse_mode(const json &mode_obj);
+    // void parse_landing(const json &land_obj);
+    // void parse_altitude(const json &alt_obj);
+    void parse_altitude(const std::vector<unsigned char> &altData);
     void send_mode(const bool active);
     void send_landing(const bool active);
     void pub_log_check(const std::string &in_str, int log_level, bool send);
@@ -118,7 +129,7 @@ private:
     std::string prefix_log = "log_";
     // control signals
     std::ofstream file_sig;
-    std::string header_sig = "time_esp_ms,time_esp_prop,Delta_t_prop_ms,z_prop,z_dot_prop,chnThr,chnEle,chnAil,chnRud";
+    std::string header_sig = "time_esp_ms,time_esp_prop,Delta_t_prop_ms,time_pc_ms,z_prop,z_dot_prop,chnThr,chnEle,chnAil,chnRud";
     std::string prefix_sig = "alt_prop_ctrl_";
     
 

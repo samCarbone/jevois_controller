@@ -11,7 +11,7 @@
 #include "conductor.h"
 #include <string>
 
-int main(int argc, char*argv[])
+int main(int argc, char* argv[])
 {
 
     // /* 
@@ -76,7 +76,21 @@ int main(int argc, char*argv[])
     // }
 
     std::string file_name = "/dev/ttyS0";
-    Conductor *my_object = new Conductor(file_name);
+    if(argc >= 3) {
+        if(strcmp(argv[1], "-f") == 0) {
+            file_name.assign(argv[2]);
+            #ifdef IS_HOST
+            std::cout << file_name << std::endl;
+            #endif
+        }
+    }
+
+    #ifdef IS_HOST
+    std::cout << "Running on host" << std::endl;
+    #endif
+    
+    unsigned int baud_rate = 57600;
+    Conductor *my_object = new Conductor(file_name, baud_rate);
 
 
     // // Set serial port params back to the original

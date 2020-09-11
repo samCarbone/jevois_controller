@@ -6,15 +6,15 @@
 
 Conductor::Conductor()
 {
-	Conductor("/dev/ttyS0");
+	Conductor("/dev/ttyS0", 57600);
 }
 
-Conductor::Conductor(std::string serial_port_name)
+Conductor::Conductor(std::string serial_port_name, unsigned int baud_rate)
 {
 
     // Construct and open the serial port
     esp_port = new boost::asio::serial_port(io, serial_port_name);
-    esp_port->set_option(boost::asio::serial_port_base::baud_rate(57600));
+    esp_port->set_option(boost::asio::serial_port_base::baud_rate(baud_rate));
     esp_port->set_option(boost::asio::serial_port_base::flow_control(boost::asio::serial_port_base::flow_control::none));
     esp_port->set_option(boost::asio::serial_port_base::character_size(8));
     esp_port->set_option(boost::asio::serial_port_base::parity(boost::asio::serial_port_base::parity::none));
@@ -22,7 +22,7 @@ Conductor::Conductor(std::string serial_port_name)
     
     // Setup serial read handler
     esp_port->async_read_some(boost::asio::buffer(serial_read_buffer), boost::bind(&Conductor::serial_read_handler, this, boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred));
-    serial_read_concat.reserve(256);
+    serial_payload.reserve(256);
 
     // Epoch time for receiving esp messages
     start_time_jv = std::chrono::steady_clock::now();
@@ -36,11 +36,18 @@ Conductor::Conductor(std::string serial_port_name)
     alt_estimator = new AltitudeEstimator();
 
     // Open files - allow for immediate recording
+    #ifndef IS_HOST
     set_file_suffix("jv");
     set_file_directory("/jevois/scripts/logs");
+    #endif
+    #ifdef IS_HOST
+    set_file_suffix("jv");
+    set_file_directory("/home/samuel/Documents/host_logs");
+    #endif
+
     open_files();
 
-    pub_log_check("Started", INFO, true);
+    pub_log_check("Started", LL_INFO, true);
 
     // Run boost io
     io.run();
@@ -65,338 +72,361 @@ Conductor::~Conductor()
 //
 // **********************************************************
 
-// [{, }]
-bool Conductor::find_json_start(std::vector<char> &data, int search_start, int &start)
-{
-    start = search_start;
-    for(int i=search_start; i<data.size(); i++) {
-        if(data.at(i) == '{') {
-            start = i;
-            return true;
-        }
-    }
-    return false;
-}
 
-
-bool Conductor::find_json_overlap(std::vector<char> &prev_data, std::vector<char> &data, int &end_delta)
-{
-
-    const std::vector<char> END_SEQ = {'}', '\r', '\n'};
-
-    // Not the neatest solution, but hard-coded check the two overlap cases
-    if(prev_data.size() >= 2 && (int)data.size() >= 1) {
-        if(prev_data.at(prev_data.size()-2) == END_SEQ.at(0) && prev_data.at(prev_data.size()-1) == END_SEQ.at(1) && data.at(0) == END_SEQ.at(2))
-        { 
-            end_delta = -2;
-            return true; 
-        }
-    }
-    
-    if(prev_data.size() >= 1 && (int)data.size() >= 2) {
-        if(prev_data.back() == END_SEQ.at(0) && data.at(0) == END_SEQ.at(1) && data.at(1) == END_SEQ.at(2)) 
-        {
-            end_delta = -1;
-            return true; 
-        }
-    }
-
-    return false;
-
-}
-
-// [{, }]
-bool Conductor::find_json_end(std::vector<char> &prev_data, std::vector<char> &data, int search_start, int &end)
-{
-    const std::vector<char> END_SEQ = {'}', '\r', '\n'};
-    end = search_start;
-    for(int i=search_start; i<(int)data.size()-(int)END_SEQ.size()+1; i++) {
-        if(std::equal(data.begin()+i, data.begin()+i+END_SEQ.size(), END_SEQ.begin(), END_SEQ.end())) {
-            end = i;
-            return true;
-        }
-    }
-    return false;
-}
 
 void Conductor::serial_read_handler(const boost::system::error_code& error, std::size_t bytes_transferred)
 {
     if(!error)
     {
 
-        // TODO: look at eliminating this copy
-        std::vector<char> payload(serial_read_buffer.begin(), serial_read_buffer.begin()+bytes_transferred);
-
-        bool finished = false; // Done processing this current payload
-        int start = 0;
-        int search_begin_idx = 0;
-        while(!finished) {
+        std::size_t bytes_available = bytes_transferred;
+        std::size_t read_idx = 0;
+        while(read_idx < bytes_transferred) {
+        
+            if(recv_state == IDLE_W) {
+                if(serial_read_buffer.at(read_idx) == '#') {
+                    recv_state = SOF_A;
+                }
+                else {
+                    std::cerr << serial_read_buffer.at(read_idx);
+                    #ifdef IS_HOST
+                    std::cout << serial_read_buffer.at(read_idx);
+                    #endif
+                }
+                read_idx++;
+            }
             
-            // try {
-            if(!found_start) {
-                // Find start
-                if(find_json_start(payload, search_begin_idx, start)) {
-                    serial_read_concat.clear();
-                    found_start = true;
+            if(recv_state == SOF_A && read_idx < bytes_transferred) {
+                if(serial_read_buffer.at(read_idx) == 'S') {
+                    recv_state = LEN_LO;
+                }
+                else if(serial_read_buffer.at(read_idx) == '#') {
+                    recv_state = SOF_A;
                 }
                 else {
-                    finished = true;
+                    recv_state = IDLE_W;
+                    std::cerr << serial_read_buffer.at(read_idx);
+                    #ifdef IS_HOST
+                    std::cout << serial_read_buffer.at(read_idx);
+                    #endif
                 }
+                read_idx++;
             }
-
-            if(found_start) {
+            
+            if(recv_state == LEN_LO && read_idx < bytes_transferred) {
+                payload_len = serial_read_buffer.at(read_idx);
+                payload_idx = 0;
+                serial_payload.clear();
+                recv_state = PAYLOAD;
+                read_idx++;
+            }
+            
+            if(recv_state == PAYLOAD) {
+                if(bytes_transferred < read_idx || payload_len < payload_idx) {
+                    recv_state = IDLE_W; // Reset the state
+                    break;
+                }
+                std::size_t read_len = (bytes_transferred - read_idx) < (payload_len - payload_idx) ? (bytes_transferred - read_idx) : (payload_len - payload_idx);
+                if(read_len > 0) {
+                    serial_payload.insert(serial_payload.end(), serial_read_buffer.begin()+read_idx, serial_read_buffer.begin()+read_idx+read_len);
+                    payload_idx += read_len;
+                }
+                if(payload_idx >= payload_len) {
+                    recv_state = CRC_HI;
+                }
+                read_idx += read_len;
+            }
+            
+            if(recv_state == CRC_HI && read_idx < bytes_transferred) {
+                cksum_hi = serial_read_buffer.at(read_idx);
+                read_idx++;
+                recv_state = CRC_LO;
+            }
+            
+            if(recv_state == CRC_LO && read_idx < bytes_transferred) {
+                std::uint8_t cksum_lo = serial_read_buffer.at(read_idx);
+                read_idx++;
                 
-                int end = 0;
-                int end_delta = 0;
-                if(start == 0 && find_json_overlap(serial_read_concat, payload, end_delta)) {
-                    // at the end ---> -1, second last --> -2
-                    search_begin_idx = 2;
-                    if(end_delta == -2) {
-                        serial_read_concat.erase(serial_read_concat.end()-1, serial_read_concat.end());
-                        search_begin_idx = 1;
-                    }
-                    parse_packet(serial_read_concat, 0, serial_read_concat.size());
-                    found_start = false;
+                // Now check the checksum
+                std::uint16_t sum_recv = (static_cast<std::uint16_t>(cksum_hi) << 8) + static_cast<std::uint16_t>(cksum_lo);
+                std::uint16_t sum_calc = CRC::Calculate(serial_payload.data(), serial_payload.size(), CRC::CRC_16_XMODEM());
+                if(sum_calc == sum_recv) {
+                    recv_state = VALID;
                 }
-
-                else if(find_json_end(serial_read_concat, payload, start, end)) {
-                    serial_read_concat.insert(serial_read_concat.end(), payload.begin()+start, payload.begin()+end+1);
-                    parse_packet(serial_read_concat, 0, serial_read_concat.size());
-                    search_begin_idx = end+3;
-                    found_start = false;
-                }
-
                 else {
-
-                    if((int)serial_read_concat.size()+((int)payload.size()- start) > SRC_MAX_LEN) {
-                        // Disregard this payload and reset
-                        found_start = false;
-                    }
-                    else {
-                        serial_read_concat.insert(serial_read_concat.end(), payload.begin()+start, payload.end());
-                                        
-                    }
-                    finished = true;
-
+                    recv_state = IDLE_W;
                 }
+                
             }
-            else {
-                finished = true;
+            
+            if(recv_state == VALID) {
+                // Now process the payload
+                // ----- //
+                parse_packet(serial_payload);
+                
+                // Reset the state
+                recv_state = IDLE_W;
+                
             }
-
         }
-
     }
     else {
-        pub_log_check("Serial read error", ERROR, true);
+        pub_log_check("Serial read error", LL_ERROR, true);
     }
 
     esp_port->async_read_some(boost::asio::buffer(serial_read_buffer), boost::bind(&Conductor::serial_read_handler, this, boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred));
 
 }
 
-// bool Conductor::find_first_json(const std::vector<char> &inVec, int &start, int &end)
-// {
-
-//     bool found_start = false;
-//     start = 0;
-//     end = 0;
-//     std::array<char, 3> DELIM = {'}', '\r', '\n'};
-//     // Search for the start
-//     for(int i=0; i<inVec.size()-DELIM.size(); i++) {
-//         if(inVec.at(i) == '{') {
-//             start = i;
-//             found_start = true;
-//             break;
-//         }
-//     }
-
-//     if(found_start) {
-//         // Search for the end
-//         for(int i=start+1; i<inVec.size()-DELIM.size()+1; i++) {
-//             bool is_end = true;
-//             for(int j=0; j<DELIM.size()&&is_end; j++) {
-//                 is_end &= inVec.at(i+j) == DELIM.at(j);
-//             }
-//             if(is_end) {
-//                 end = i;
-//                 return true;
-//             }
-//         }
-//     } 
-//     return false;    
-// }
-
-
-// [start, end] --> [", "]
-bool Conductor::find_first_msp(const std::vector<char> &inVec, int &start, int &end)
-{
-
-    const std::array<char, 2> chrs_option_1 = {'{',','};
-    const std::array<char, 7> chrs_2 = {'\"', 'm', 's','p','\"',':','\"'};
-    bool found_start = false;
-    const char chr_3 = '\"';
-    const std::array<char, 2> chrs_option_4 = {',','}'};
-    start = 0;
-    end = 0;
-    int expected_end = 0;
-    const int min_msp_len = 6;
-
-    // Find the start
-    for(int i=0; i<(int)inVec.size()-(int)chrs_2.size()-2-min_msp_len; i++) {
-
-        // Check for the first character
-        // one OR the other
-        for(auto &opt : chrs_option_1) {
-            if(inVec.at(i) == opt) {
-                found_start = true;
-                break;
-            }
-        }
-        if(!found_start)
-            continue;
-
-        // Check for the next sequence of characters
-        for(int j=0; j<chrs_2.size(); j++) {
-
-            if(inVec.at(i+1+j) != chrs_2.at(j)) {
-                found_start = false;
-                break;
-            }
-
-        }
-
-        if(found_start) {
-            start = i+chrs_2.size();
-            // the msp message length is read and used to find the end
-            unsigned char message_len = static_cast<unsigned char>(inVec.at(start+4));
-            expected_end = start + min_msp_len + static_cast<int>(message_len) + 1;
-            break;
-        }
-
-    }
-
-    if(found_start && expected_end < (int)inVec.size()-1) {
-
-        if(inVec.at(expected_end) != chr_3)
-            return false;
-
-        for(auto &opt: chrs_option_4) {
-            if(inVec.at(expected_end+1) == opt) {
-                end = expected_end;
-                return true;
-            }
-        }
-
-    }
-
-    return false;
+// Function to construct/send packet
+void Conductor::send_payload(const std::vector<char> &data) {
+    std::vector<char> packet;
+    packet.reserve(data.size() + 5);
+    packet.push_back('#');
+    packet.push_back('S');
+    std::uint8_t payload_size = data.size() <= 255 ? data.size() : 255;
+    packet.push_back(static_cast<char>(payload_size));
+    packet.insert(packet.end(), data.begin(), data.begin()+payload_size);
+    
+    // Calculate the checksum
+    std::uint16_t sum_calc = CRC::Calculate(data.data(), payload_size, CRC::CRC_16_XMODEM());
+    packet.push_back(static_cast<char>((sum_calc & 0xFF00) >> 8));
+    packet.push_back(static_cast<char>(sum_calc & 0xFF));
+    
+    // Send
+    esp_port->async_write_some( boost::asio::buffer(packet), boost::bind(&Conductor::serial_write_handler, this, boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred) );
 
 }
 
-// [start, end)
-void Conductor::parse_packet(const std::vector<char> &inVec, const int start, const int end)
+void Conductor::send_payload(const std::string &data_str) {
+    std::vector<char> data(data_str.begin(), data_str.end());
+    send_payload(data);
+}
+
+// [start, end] --> [", "]
+// bool Conductor::find_first_msp(const std::vector<char> &inVec, int &start, int &end)
+// {
+
+//     const std::array<char, 2> chrs_option_1 = {'{',','};
+//     const std::array<char, 7> chrs_2 = {'\"', 'm', 's','p','\"',':','\"'};
+//     bool found_start = false;
+//     const char chr_3 = '\"';
+//     const std::array<char, 2> chrs_option_4 = {',','}'};
+//     start = 0;
+//     end = 0;
+//     int expected_end = 0;
+//     const int min_msp_len = 6;
+
+//     // Find the start
+//     for(int i=0; i<(int)inVec.size()-(int)chrs_2.size()-2-min_msp_len; i++) {
+
+//         // Check for the first character
+//         // one OR the other
+//         for(auto &opt : chrs_option_1) {
+//             if(inVec.at(i) == opt) {
+//                 found_start = true;
+//                 break;
+//             }
+//         }
+//         if(!found_start)
+//             continue;
+
+//         // Check for the next sequence of characters
+//         for(int j=0; j<chrs_2.size(); j++) {
+
+//             if(inVec.at(i+1+j) != chrs_2.at(j)) {
+//                 found_start = false;
+//                 break;
+//             }
+
+//         }
+
+//         if(found_start) {
+//             start = i+chrs_2.size();
+//             // the msp message length is read and used to find the end
+//             unsigned char message_len = static_cast<unsigned char>(inVec.at(start+4));
+//             expected_end = start + min_msp_len + static_cast<int>(message_len) + 1;
+//             break;
+//         }
+
+//     }
+
+//     if(found_start && expected_end < (int)inVec.size()-1) {
+
+//         if(inVec.at(expected_end) != chr_3)
+//             return false;
+
+//         for(auto &opt: chrs_option_4) {
+//             if(inVec.at(expected_end+1) == opt) {
+//                 end = expected_end;
+//                 return true;
+//             }
+//         }
+
+//     }
+
+//     return false;
+
+// }
+
+// [{, }]
+void Conductor::parse_packet(const std::vector<char> &inVec)
 {
-    // Copy into a new vector --> not ideal if not necessary
-    std::vector<char> cut_vec(inVec.begin()+start, inVec.begin()+end);
+    // // Copy into a new vector --> not ideal if not necessary
+    // std::vector<char> cut_vec(inVec.begin(), inVec.end());
 
-    /* Note: this does not support multiple msp messages
-    within a single json packet. It will use the first msp message.
-    */
-    // MSP search ({,)"msp":"*"(,})
+    // /* Note: this does not support multiple msp messages
+    // within a single json packet. It will use the first msp message.
+    // */
+    // // MSP search ({,)"msp":"*"(,})
+    // // try {
+    // std::vector<char> msp_vec;
+    // bool found_msp = false;
+    // int start_msp = 0;
+    // int end_msp = 0;
+    // if(find_first_msp(cut_vec, start_msp, end_msp)) {
+    //     // copy and erase between the " "
+    //     msp_vec.insert(msp_vec.begin(), cut_vec.begin()+start_msp+1, cut_vec.begin()+end_msp);
+    //     cut_vec.erase(cut_vec.begin()+start_msp+1, cut_vec.begin()+end_msp);
+
+    //     found_msp = true;
+    // }
+    // else {
+    //     // Safe any bytes outside acceptable range
+    //     for (int i=0; i<cut_vec.size(); i++) {
+    //         if(cut_vec.at(i) <= 31) {
+    //             if(cut_vec.at(i) == '\r') {cut_vec.at(i) = 'r';}
+    //             else if(cut_vec.at(i) == '\n') {cut_vec.at(i) = 'n';}
+    //             else {cut_vec.at(i) = '#';}
+    //         }
+    //     }
+    // }
+
+    // // Catch all exceptions during parsing
+    // // We want to keep the program running and just ignore invalid json packets
+    // json j_doc;
     // try {
-    std::vector<char> msp_vec;
-    bool found_msp = false;
-    int start_msp = 0;
-    int end_msp = 0;
-    if(find_first_msp(cut_vec, start_msp, end_msp)) {
-        // copy and erase between the " "
-        msp_vec.insert(msp_vec.begin(), cut_vec.begin()+start_msp+1, cut_vec.begin()+end_msp);
-        cut_vec.erase(cut_vec.begin()+start_msp+1, cut_vec.begin()+end_msp);
+    //     j_doc = json::parse(cut_vec);
+    // } catch(const std::exception& e) {
+    //     pub_log_check("JSON parse error", LL_ERROR, true);
+    //     std::cerr << "[caught] " << e.what() << std::endl;   
+    //     return; 
+    // }
+        
+    // if(j_doc.is_null())
+    //         return;
 
-        found_msp = true;
-    }
-    else {
-        // Safe any bytes outside acceptable range
-        for (int i=0; i<cut_vec.size(); i++) {
-            if(cut_vec.at(i) <= 31) {
-                if(cut_vec.at(i) == '\r') {cut_vec.at(i) = 'r';}
-                else if(cut_vec.at(i) == '\n') {cut_vec.at(i) = 'n';}
-                else {cut_vec.at(i) = '#';}
-            }
-        }
-    }
-    // } catch (const std::exception& e) {
-    //     std::cerr << "[caught: find_first_msp] " << e.what() << std::endl;    
+    // if (j_doc["dst"] != "jv") {
+    //     pub_log_check("Incorrect json dest", LL_ERROR, true);
     //     return;
     // }
 
-    // Echo the cut vector
-    // esp_port->async_write_some( boost::asio::buffer(cut_vec), boost::bind(&Conductor::serial_write_handler, this, boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred) );
+    // pub_log_check("JSON received", LL_DEBUG, true);
 
-    // Catch all exceptions
-    // We want to keep the program running and just ignore invalid json packets
-    
-    json j_doc;
-    try {
-        j_doc = json::parse(cut_vec);
-    } catch(const std::exception& e) {
-        pub_log_check("JSON parse error", ERROR, true);
-        std::cerr << "[caught] " << e.what() << std::endl;   
-        return; 
+    // if(j_doc["snd"] == "esp") {
+
+    //     if(j_doc["typ"] == "alt") {
+    //         parse_altitude(j_doc["alt"]);
+    //         pub_log_check("Altitude received", LL_DEBUG, true);
+    //     }
+        
+    //     else if(j_doc["typ"] == "msp") {
+    //         // Need to search for the msp bytes
+    //         // parse_msp(std::vector<char> msp_vec);
+    //         pub_log_check("MSP received", LL_DEBUG, true);
+    //     }
+
+    // }
+
+    // else if (j_doc["snd"] == "pc") {
+
+    //     if(j_doc["typ"] == "mode") {
+    //         pub_log_check("Mode received", LL_DEBUG, true);
+    //         parse_mode(j_doc);
+    //     }
+
+    //     else if(j_doc["typ"] == "land") {
+    //         pub_log_check("Landing received", LL_DEBUG, true);
+    //         parse_landing(j_doc);
+    //     }
+
+    //     else if(j_doc["typ"] == "quit") {
+    //         set_controller_activity(false);
+    //         pub_log_check("Quit", LL_INFO, true); // Might not send
+    //         send_timer->cancel();
+    //         esp_port->cancel();
+    //         esp_port->close();
+    //     }
+
+    // }
+
+    if(inVec.size()<4) {
+        pub_log_check("Packet len<4", LL_ERROR, true);
+        return;
     }
-        // Echo the json packet
-        // std::string s = j_doc.dump();
-        // s += '\r\n';
-        // esp_port->async_write_some( boost::asio::buffer(s), boost::bind(&Conductor::serial_write_handler, this, boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred) );
+    char src = inVec.at(0);
+    char dst = inVec.at(1);
+    char mid = inVec.at(2);
+    char rsp = inVec.at(3);
 
-    if(j_doc.is_null())
-            return;
-
-    if (j_doc["dst"] != "jv") {
-        pub_log_check("Incorrect json dest", ERROR, true);
+    if(dst != DST_JV) {
+        pub_log_check("Incorrect packet dest", LL_ERROR, true);
         return;
     }
 
-    pub_log_check("JSON received", DEBUG, true);
+    if(src == SRC_ESP) {
 
-    if(j_doc["snd"] == "esp") {
-
-        if(j_doc["typ"] == "alt") {
-            parse_altitude(j_doc["alt"]);
-            pub_log_check("Altitude received", DEBUG, true);
+        if(mid == MID_ALT) {
+            std::vector<unsigned char> alt_data(inVec.begin()+4, inVec.end());
+            parse_altitude(alt_data);
         }
         
-        else if(j_doc["typ"] == "msp") {
-            // Need to search for the msp bytes
-            // parse_msp(std::vector<char> msp_vec);
-            pub_log_check("MSP received", DEBUG, true);
-        }
-
     }
+    else if(src == SRC_PC) {
+        pub_log_check("SRC PC", LL_DEBUG, true);
 
-    else if (j_doc["snd"] == "pc") {
+        if(mid == MID_MODE && inVec.size() == 5) {
+            if(inVec.at(4) == JV_CTRL_ENA) {
+                set_controller_activity(true);
+            }
+            else if(inVec.at(4) == JV_CTRL_DIS) {
+                set_controller_activity(false);
+            }
 
-        if(j_doc["typ"] == "mode") {
-            pub_log_check("Mode received", DEBUG, true);
-            parse_mode(j_doc);
+            if(rsp == RSP_TRUE) {
+                send_mode(controller_activity);
+            }
         }
+        else if(mid == MID_LAND && inVec.size() == 5) {
+            if(inVec.at(4) == JV_LAND_ENA) {
+                set_landing(true);
+            }
+            else if(inVec.at(4) == JV_LAND_DIS) {
+                set_landing(false);
+            }
 
-        else if(j_doc["typ"] == "land") {
-            pub_log_check("Landing received", DEBUG, true);
-            parse_landing(j_doc);
+            if(rsp == RSP_TRUE) {
+                send_landing(landing);
+            }  
         }
-
-        else if(j_doc["typ"] == "quit") {
-            set_controller_activity(false);
-            pub_log_check("Quit", INFO, true); // Might not send
-            send_timer->cancel();
-            esp_port->cancel();
-            esp_port->close();
+        else if(mid == MID_QUIT && inVec.size() == 5) {
+            if(inVec.at(4) == JV_QUIT_TRUE) {
+                set_controller_activity(false);
+                pub_log_check("Quit", LL_INFO, true); // Might not send
+                send_timer->cancel();
+                esp_port->cancel();
+                esp_port->close();
+            }
+            else {
+                pub_log_check("Not quit", LL_INFO, true); // Not necessary
+            }
         }
-
     }
+    else if(src == SRC_FC) {
+        if(mid == MID_MSP) {
 
+        }
+    }
 
 }
 
@@ -408,41 +438,115 @@ void Conductor::serial_write_handler(const boost::system::error_code& error, std
 
     }
     else {
-        pub_log_check("Serial write error", ERROR, true);
+        pub_log_check("Serial write error", LL_ERROR, true);
     }
 }
 
 
 
-void Conductor::parse_altitude(const json &alt_obj)
+// void Conductor::parse_altitude(const json &alt_obj)
+// {
+//     if(alt_obj.contains("sigrt") && alt_obj.contains("ambrt") && alt_obj.contains("sigma")
+//             && alt_obj.contains("spad") && alt_obj.contains("range") && alt_obj.contains("time")
+//             && alt_obj.contains("status") )
+//     {
+//         RangingData_t altData;
+//         altData.signal_rate = alt_obj["sigrt"].get<double>();
+//         altData.ambient_rate = alt_obj["ambrt"].get<double>();
+//         altData.sigma_mm = alt_obj["sigma"].get<double>();
+//         altData.eff_spad_count = alt_obj["spad"].get<double>()/256.0; // divide by 256 for real value
+//         altData.range_mm = alt_obj["range"].get<int>();
+//         altData.timeEsp_ms = alt_obj["time"].get<int>();
+//         altData.status = alt_obj["status"].get<int>();
+//         altData.timePc_ms = time_elapsed_ms();
+
+//         // Update state estimate
+//         alt_estimator->addRangeMeasurement(altData);
+//         AltState_t estimatedState = alt_estimator->getStateEstimate();
+
+//         // Update controller
+//         if(controller_activity) {
+//             alt_controller->addEstState(estimatedState);
+//         }
+
+//     }
+//     else 
+//     {
+//         pub_log_check("Invalid alt packet", LL_ERROR, true);
+//     }
+
+// }
+
+void Conductor::parse_altitude(const std::vector<unsigned char> &altData)
 {
-    if(alt_obj.contains("sigrt") && alt_obj.contains("ambrt") && alt_obj.contains("sigma")
-            && alt_obj.contains("spad") && alt_obj.contains("range") && alt_obj.contains("time")
-            && alt_obj.contains("status") )
-    {
-        RangingData_t altData;
-        altData.signal_rate = alt_obj["sigrt"].get<double>();
-        altData.ambient_rate = alt_obj["ambrt"].get<double>();
-        altData.sigma_mm = alt_obj["sigma"].get<double>();
-        altData.eff_spad_count = alt_obj["spad"].get<double>()/256.0; // divide by 256 for real value
-        altData.range_mm = alt_obj["range"].get<int>();
-        altData.timeEsp_ms = alt_obj["time"].get<int>();
-        altData.status = alt_obj["status"].get<int>();
-        altData.timePc_ms = time_elapsed_ms();
+    // if(alt_obj.contains("sigrt") && alt_obj.contains("ambrt") && alt_obj.contains("sigma")
+    //         && alt_obj.contains("spad") && alt_obj.contains("range") && alt_obj.contains("time")
+    //         && alt_obj.contains("status") )
+    // {
+    //     RangingData_t altData;
+    //     altData.signal_rate = alt_obj["sigrt"].get<double>();
+    //     altData.ambient_rate = alt_obj["ambrt"].get<double>();
+    //     altData.sigma_mm = alt_obj["sigma"].get<double>();
+    //     altData.eff_spad_count = alt_obj["spad"].get<double>()/256.0; // divide by 256 for real value
+    //     altData.range_mm = alt_obj["range"].get<int>();
+    //     altData.timeEsp_ms = alt_obj["time"].get<int>();
+    //     altData.status = alt_obj["status"].get<int>();
+    //     altData.timePc_ms = time_elapsed_ms();
 
-        // Update state estimate
-        alt_estimator->addRangeMeasurement(altData);
-        AltState_t estimatedState = alt_estimator->getStateEstimate();
+    //     // Update state estimate
+    //     alt_estimator->addRangeMeasurement(altData);
+    //     AltState_t estimatedState = alt_estimator->getStateEstimate();
 
-        // Update controller
-        if(controller_activity) {
-            alt_controller->addEstState(estimatedState);
-        }
+    //     // Update controller
+    //     if(controller_activity) {
+    //         alt_controller->addEstState(estimatedState);
+    //     }
 
+    // }
+    // else 
+    // {
+    //     pub_log_check("Invalid alt packet", LL_ERROR, true);
+    // }
+
+    if(altData.size() != 22) {
+        pub_log_check("Invalid alt packet", LL_ERROR, true);
+        return;
     }
-    else 
-    {
-        pub_log_check("Invalid alt packet", ERROR, true);
+
+    mod_VL53L1_RangingMeasurementData_t rawData = {0, 0, 0, 0, 0, 0, 0, 0};
+    rawData.TimeStamp = (std::uint32_t)altData.at(0) | (std::uint32_t)altData.at(1) << 8 | (std::uint32_t)altData.at(2) << 16 | (std::uint32_t)altData.at(3) << 24;
+    rawData.StreamCount = (std::uint8_t)altData.at(4);
+    rawData.SignalRateRtnMegaCps = (FixPoint1616_t)altData.at(5) | (FixPoint1616_t)altData.at(6) << 8 | (FixPoint1616_t)altData.at(7) << 16 | (FixPoint1616_t)altData.at(8) << 24;
+    rawData.AmbientRateRtnMegaCps = (FixPoint1616_t)altData.at(9) | (FixPoint1616_t)altData.at(10) << 8 | (FixPoint1616_t)altData.at(11) << 16 | (FixPoint1616_t)altData.at(12) << 24;
+    rawData.EffectiveSpadRtnCount = (std::uint16_t)altData.at(13) | (std::uint16_t)altData.at(14) << 8;
+    rawData.SigmaMilliMeter = (FixPoint1616_t)altData.at(15) | (FixPoint1616_t)altData.at(16) << 8 | (FixPoint1616_t)altData.at(17) << 16 | (FixPoint1616_t)altData.at(18) << 24;
+    rawData.RangeMilliMeter = (std::int16_t)altData.at(19) | (std::int16_t)altData.at(20) << 8;
+    rawData.RangeStatus = (std::uint8_t)altData.at(21);
+
+    RangingData_t convData;
+    convData.timeEsp_ms = (long int) rawData.TimeStamp;
+    convData.timePc_ms = (long int) time_elapsed_ms();
+    convData.signal_rate = rawData.SignalRateRtnMegaCps/65336.0;
+    convData.ambient_rate = rawData.AmbientRateRtnMegaCps/65336.0;
+    convData.eff_spad_count = rawData.EffectiveSpadRtnCount/256.0;
+    convData.sigma_mm = rawData.SigmaMilliMeter/65336.0;
+    convData.range_mm = rawData.RangeMilliMeter;
+    convData.status = rawData.RangeStatus;
+
+    // #ifdef IS_HOST
+    // std::cout << "Time esp: " << convData.timeEsp_ms
+    //             << ", Time pc: " << convData.timePc_ms
+    //             << ", sigma_mm: " << convData.sigma_mm
+    //             << ", range_mm: " << convData.range_mm << std::endl;
+    // #endif
+
+    // Update state estimate
+    alt_estimator->addRangeMeasurement(convData);
+    AltState_t estimatedState = alt_estimator->getStateEstimate();
+
+    // Update controller
+    if(controller_activity) {
+        alt_controller->addEstState(estimatedState);
     }
 
 }
@@ -462,23 +566,23 @@ int Conductor::value_to_tx_range(double value)
 {
     if (value > MAX_CHANNEL_VALUE) {
         value = MAX_CHANNEL_VALUE;
-        pub_log_check("channel value out of range (greater)", WARN, true);
+        pub_log_check("channel value out of range (greater)", LL_WARN, true);
     }
     else if (value < MIN_CHANNEL_VALUE) {
         value = MIN_CHANNEL_VALUE;
-        pub_log_check("channel value out of range (lower)", WARN, true);
+        pub_log_check("channel value out of range (lower)", LL_WARN, true);
     }
 
     return round(value*6 + 1500); // Scaled from (-100, 100) to (900, 2100)
 }
 
-double Conductor::saturate(double channel_value)
+double Conductor::saturate(double channel_value, const double MIN, const double MAX)
 {
-    if (channel_value > MAX_CHANNEL_VALUE) {
-        channel_value = MAX_CHANNEL_VALUE;
+    if (channel_value > MAX) {
+        channel_value = MAX;
     }
-    else if (channel_value < MIN_CHANNEL_VALUE) {
-        channel_value = MIN_CHANNEL_VALUE;
+    else if (channel_value < MIN) {
+        channel_value = MIN;
     }
     return channel_value;
 }
@@ -488,49 +592,61 @@ double Conductor::saturate(double channel_value)
 // Mode
 // **********************************************************
 
-void Conductor::parse_mode(const json &mode_obj)
-{
-    if(mode_obj["mode"].get<int>() == 1) { // TODO: change to enum
-        set_controller_activity(true);
-        pub_log_check("Controller started", INFO, true);
-    }
-    else if(mode_obj["mode"].get<int>() == 2) { // TODO: change to enum
-        set_controller_activity(false);
-        pub_log_check("Controller stopped", INFO, true);
-    }
+// void Conductor::parse_mode(const json &mode_obj)
+// {
+//     if(mode_obj["mode"].get<int>() == 1) { // TODO: change to enum
+//         set_controller_activity(true);
+//         pub_log_check("Controller started", LL_INFO, true);
+//     }
+//     else if(mode_obj["mode"].get<int>() == 2) { // TODO: change to enum
+//         set_controller_activity(false);
+//         pub_log_check("Controller stopped", LL_INFO, true);
+//     }
 
-    if(mode_obj["rsp"] == "true") {
-        send_mode(controller_activity);
-    }
+//     if(mode_obj["rsp"] == "true") {
+//         send_mode(controller_activity);
+//     }
 
-}
+// }
 
-void Conductor::parse_landing(const json &land_obj)
-{
-    if(land_obj["land"].get<int>() == 1) { // TODO: change to enum
-        set_landing(true);
-        pub_log_check("Landing started", INFO, true);
-    }
-    else if(land_obj["land"].get<int>() == 2) { // TODO: change to enum
-        set_landing(false);
-        pub_log_check("Landing stopped", INFO, true);
-    }
+// void Conductor::parse_landing(const json &land_obj)
+// {
+//     if(land_obj["land"].get<int>() == 1) { // TODO: change to enum
+//         set_landing(true);
+//         pub_log_check("Landing started", LL_INFO, true);
+//     }
+//     else if(land_obj["land"].get<int>() == 2) { // TODO: change to enum
+//         set_landing(false);
+//         pub_log_check("Landing stopped", LL_INFO, true);
+//     }
 
-    if(land_obj["rsp"] == "true") {
-        send_landing(landing);
-    }
-}
+//     if(land_obj["rsp"] == "true") {
+//         send_landing(landing);
+//     }
+// }
 
 void Conductor::set_controller_activity(const bool is_active)
 {
-    landing = false;
-    controller_activity = is_active;
-    alt_controller->resetState();
 
-    if(is_active) {
-        // Make a better way of setting the target
-        AltTarget_t targetTemp; targetTemp.z = -0.5; targetTemp.z_dot = 0;
-        alt_controller->setTarget(targetTemp);
+    if(is_active != controller_activity) {
+
+        landing = false;
+        controller_activity = is_active;
+        alt_controller->resetState();
+
+        if(is_active) {
+            // Make a better way of setting the target
+            AltTarget_t targetTemp; targetTemp.z = -0.5; targetTemp.z_dot = 0;
+            alt_controller->setTarget(targetTemp);
+            // Close/reopen files to reprint each of the headers
+            close_files();
+            open_files();
+            pub_log_check("Controller started", LL_INFO, true);
+        }
+        else {
+            pub_log_check("Controller stopped", LL_INFO, true);
+        }
+
     }
 
 }
@@ -542,36 +658,45 @@ bool Conductor::get_controller_activity()
 
 void Conductor::set_landing(bool is_landing)
 {
-    landing = is_landing;
+    if(landing != is_landing) {
+        landing = is_landing;
+        if(landing) {
+            pub_log_check("Landing started", LL_INFO, true);
+        }
+        else {
+            pub_log_check("Landing stopped", LL_INFO, true);
+        }
+    }
 }
 
 void Conductor::send_mode(const bool active)
 {
-    json send_doc;
-    send_doc["snd"] = "jv";
-    send_doc["dst"] = "pc";
-    send_doc["typ"] = "mode";
-    send_doc["mode"] = active ? 1 : 2; // TODO: change to enum
+    // json send_doc;
+    // send_doc["snd"] = "jv";
+    // send_doc["dst"] = "pc";
+    // send_doc["typ"] = "mode";
+    // send_doc["mode"] = active ? 1 : 2; // TODO: change to enum
 
-    // Echo the json packet
-    std::string s = send_doc.dump();
-    s += "\r\n";
-    esp_port->async_write_some( boost::asio::buffer(s), boost::bind(&Conductor::serial_write_handler, this, boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred) );
+    // // Echo the json packet
+    // std::string s = send_doc.dump();
 
+    std::vector<char> send_data = { SRC_JV, DST_PC, MID_MODE, RSP_FALSE, active ? JV_CTRL_ENA : JV_CTRL_DIS};
+    send_payload(send_data);
 }
 
 void Conductor::send_landing(const bool active)
 {
-    json send_doc;
-    send_doc["snd"] = "jv";
-    send_doc["dst"] = "pc";
-    send_doc["typ"] = "land";
-    send_doc["land"] = active ? 1 : 2; // TODO: change to enum
+    // json send_doc;
+    // send_doc["snd"] = "jv";
+    // send_doc["dst"] = "pc";
+    // send_doc["typ"] = "land";
+    // send_doc["land"] = active ? 1 : 2; // TODO: change to enum
 
-    // Echo the json packet
-    std::string s = send_doc.dump();
-    s += "\r\n";
-    esp_port->async_write_some( boost::asio::buffer(s), boost::bind(&Conductor::serial_write_handler, this, boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred) );
+    // // Echo the json packet
+    // std::string s = send_doc.dump();
+
+    std::vector<char> send_data = { SRC_JV, DST_PC, MID_LAND, RSP_FALSE, active ? JV_LAND_ENA : JV_LAND_DIS};
+    send_payload(send_data);
 
 }
 
@@ -579,9 +704,9 @@ void Conductor::send_landing(const bool active)
 // Send Timer
 // **********************************************************
 
-int Conductor::time_elapsed_ms()
+long int Conductor::time_elapsed_ms()
 {
-    return (int)std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start_time_jv).count();
+    return (long int)std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start_time_jv).count();
 }
 
 void Conductor::timer_handler(const boost::system::error_code& error)
@@ -596,7 +721,7 @@ void Conductor::timer_handler(const boost::system::error_code& error)
     if(!error)
     {
 
-        pub_log_check("Send timer", DEBUG, true);
+        pub_log_check("Send timer", LL_DEBUG, true);
 
         if(!sent_initial) {
             send_mode(controller_activity);
@@ -609,24 +734,46 @@ void Conductor::timer_handler(const boost::system::error_code& error)
             if(landing) {
                 AltTarget_t targetTemp;
                 if(alt_controller->getTarget(targetTemp)) {
-                    targetTemp.z += 0.1*((double)CONTROL_LOOP_PERIOD_MS)/1000.0; targetTemp.z_dot = 0.1;
+                    targetTemp.z += 0.1*((double)CONTROL_LOOP_PERIOD_MS)/1000.0;
+                    targetTemp.z_dot = 0.1;
                     targetTemp.z = targetTemp.z > 0.0 ? targetTemp.z : 0.0;
                     alt_controller->setTarget(targetTemp);
                 }
             }
 
-            double chn_thr, chn_ele, chn_ail, chn_rud;
-            AltState_t prop_alt_state = alt_estimator->getPropagatedStateEstimate_safe(time_elapsed_ms(), PROP_LIMIT);
-            chn_thr = saturate(alt_controller->getControlTempState(prop_alt_state));
+
+            double chn_thr = -100;
+            double chn_ele = 0;
+            double chn_ail = 0;
+            double chn_rud = 0;
+            bool error = false;
+            std::string error_str  = "";
+            long int current_pc_time_ms = time_elapsed_ms();
+            AltState_t prop_alt_state = alt_estimator->getPropagatedStateEstimate_safe(current_pc_time_ms, PROP_LIMIT, error, error_str);
+            chn_thr = saturate(alt_controller->getControlTempState(prop_alt_state), MIN_CHANNEL_VALUE, MAX_THROTTLE);
             // TODO: find a way to not set the arm channel
-            std::array<double, 16> mixed_channels = {0, 0, chn_thr, 0, 100, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+            // 0->ail, 1->ele, 2->thr, 3->rud, 4->arm
+            std::array<double, 16> mixed_channels = {chn_ail, chn_ele, chn_thr, chn_rud, 100, -100, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
             send_channels(mixed_channels, false);
+
+            if(error) {
+                pub_log_check(error_str, LL_ERROR, true);
+            }
+
+            #ifdef IS_HOST
+            std::cout << "Prop-> Time esp: " << prop_alt_state.timeEsp_ms
+                        << ", Time pc: " << prop_alt_state.timePc_ms
+                        << std::fixed << std::setprecision(4) << ", z: " << prop_alt_state.z
+                        << ", \tz_dot: " << prop_alt_state.z_dot;
+            std::cout   << ",  \tchn_thr: " << chn_thr
+                        << std::endl;
+            #endif
 
             if(files_open) {
                 // header
-                // "time_esp_ms,time_esp_prop,Delta_t_prop_ms,z_prop,z_dot_prop,chnThr,chnEle,chnAil,chnRud"
+                // "time_esp_ms,time_esp_prop,Delta_t_prop_ms,time_pc_ms,z_prop,z_dot_prop,chnThr,chnEle,chnAil,chnRud"
                 file_sig << alt_estimator->getCurrentTimeEsp_ms() << "," << prop_alt_state.timeEsp_ms << "," << prop_alt_state.timeEsp_ms-alt_estimator->getCurrentTimeEsp_ms() << ","
-                         << prop_alt_state.z << "," << prop_alt_state.z_dot << "," << chn_thr << "," << chn_ele << "," << chn_ail << "," << chn_rud << std::endl;
+                         << current_pc_time_ms << prop_alt_state.z << "," << prop_alt_state.z_dot << "," << chn_thr << "," << chn_ele << "," << chn_ail << "," << chn_rud << std::endl;
             }
 
         }
@@ -671,23 +818,27 @@ void Conductor::send_channels(const std::array<double, 16> &channels, const bool
 
     // Checksum
     char checksum = message_len ^ message_id;
-    for(int i=5; i < msp_data.size(); i++) {
+    for(unsigned int i=5; i < msp_data.size(); i++) {
         checksum ^= msp_data.at(i);
     } 
     msp_data.push_back(checksum);
 
     // Hard-code json
-    std::string pre_string = "{\"snd\":\"pc\",\"dst\":\"fc\",\"typ\":\"msp\",\"rsp\":";
-    pre_string += response ? "\"true\"" : "\"false\"";
-    pre_string += ",\"ctrl\":\"true\",\"msp\":\"";
-    std::string post_string = "\"}\r\n";
+    // std::string pre_string = "{\"snd\":\"pc\",\"dst\":\"fc\",\"typ\":\"msp\",\"rsp\":";
+    // pre_string += response ? "\"true\"" : "\"false\"";
+    // pre_string += ",\"ctrl\":\"true\",\"msp\":\"";
+    // std::string post_string = "\"}";
 
-    std::vector<char> all_data(pre_string.begin(), pre_string.end());
+    // std::vector<char> all_data(pre_string.begin(), pre_string.end());
+    // all_data.insert(all_data.end(), msp_data.begin(), msp_data.end());
+    // all_data.insert(all_data.end(), post_string.begin(), post_string.end());
+
+    // Insert msp data into a new vector. Not the most efficient way, but more portable
+    std::vector<char> all_data = {SRC_JV, DST_FC, MID_MSP, response ? RSP_TRUE : RSP_FALSE};
     all_data.insert(all_data.end(), msp_data.begin(), msp_data.end());
-    all_data.insert(all_data.end(), post_string.begin(), post_string.end());
 
     // Write to serial
-    esp_port->async_write_some( boost::asio::buffer(all_data), boost::bind(&Conductor::serial_write_handler, this, boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred) );
+    send_payload(all_data);
 
 }
 
@@ -697,13 +848,13 @@ void Conductor::pub_log_check(const std::string &in_str, int log_level, bool sen
 {
     if(log_level >= GLOBAL_LOG_LEVEL) {
         std::string lvl_str = "[]";
-        if(log_level == ALL) { lvl_str = "[ALL] "; }
-            else if(log_level == DEBUG) { lvl_str = "[DEBUG] "; }
-            else if(log_level == INFO) { lvl_str = "[INFO] "; }
-            else if(log_level == WARN) { lvl_str = "[WARN] "; }
-            else if(log_level == ERROR) { lvl_str = "[ERROR] "; }
-            else if(log_level == FATAL) { lvl_str = "[FATAL] "; }
-            else if(log_level == OFF) { lvl_str = "[OFF] "; }
+        if(log_level == LL_ALL) { lvl_str = "[ALL] "; }
+            else if(log_level == LL_DEBUG) { lvl_str = "[DEBUG] "; }
+            else if(log_level == LL_INFO) { lvl_str = "[INFO] "; }
+            else if(log_level == LL_WARN) { lvl_str = "[WARN] "; }
+            else if(log_level == LL_ERROR) { lvl_str = "[ERROR] "; }
+            else if(log_level == LL_FATAL) { lvl_str = "[FATAL] "; }
+            else if(log_level == LL_OFF) { lvl_str = "[OFF] "; }
 
         if(file_log.is_open())
             file_log << lvl_str << in_str << std::endl;
@@ -716,16 +867,15 @@ void Conductor::send_log(const std::string &in_str, int log_level)
 {
     
     json send_doc;
-    send_doc["snd"] = "jv";
-    send_doc["dst"] = "pc";
     send_doc["typ"] = "log";
     send_doc["lvl"] = log_level;
     send_doc["log"] = in_str;
 
-    // Echo the json packet
     std::string s = send_doc.dump();
-    s += "\r\n";
-    esp_port->async_write_some( boost::asio::buffer(s), boost::bind(&Conductor::serial_write_handler, this, boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred) );
+    std::vector<char> all_data = {SRC_JV, DST_PC, MID_JSON, RSP_FALSE};
+    all_data.insert(all_data.end(), s.begin(), s.end());
+
+    send_payload(all_data);
 
 }
 
