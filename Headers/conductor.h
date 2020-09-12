@@ -63,6 +63,7 @@ private:
     static constexpr double MIN_CHANNEL_VALUE = -100;
     const double MAX_THROTTLE = 0;
     const unsigned char MSP_CHANNEL_ID = 200;
+    const unsigned char MSP_ATTITUDE = 108;
     std::array<double, 4> controller_channels = {0, 0, 0, 0};
     // 0->ail, 1->ele, 2->thr, 3->rud, 4->arm
     double get_controller_channel_value(const int channel);
@@ -93,6 +94,7 @@ private:
     // void parse_landing(const json &land_obj);
     // void parse_altitude(const json &alt_obj);
     void parse_altitude(const std::vector<unsigned char> &altData);
+    void parse_attitude_msp(const std::vector<unsigned char> &attData);
     void send_mode(const bool active);
     void send_landing(const bool active);
     void pub_log_check(const std::string &in_str, int log_level, bool send);

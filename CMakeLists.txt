@@ -6,13 +6,13 @@ option(JEVOIS_PLATFORM "Build for jevois platform" OFF)
 set(JEVOIS_PLATFORM_C_COMPILER "/usr/share/jevois-sdk/out/sun8iw5p1/linux/common/buildroot/host/usr/bin/arm-buildroot-linux-gnueabihf-gcc")
 set(JEVOIS_PLATFORM_CXX_COMPILER "/usr/share/jevois-sdk/out/sun8iw5p1/linux/common/buildroot/host/usr/bin/arm-buildroot-linux-gnueabihf-g++")
 set(JEVOIS_PLATFORM_ARCH_FLAGS "-mcpu=cortex-a7 -mfpu=neon-vfpv4 -mfloat-abi=hard -ftree-vectorize -Ofast -funsafe-math-optimizations -mfp16-format=ieee")
-set(JEVOIS_PLATFORM_CFLAGS " -g -O4 -I/usr/share/jevois-sdk/out/sun8iw5p1/linux/common/buildroot/build/linux-headers-3.4.113/usr/include -fPIC -Wno-deprecated-declarations -Wno-psabi ")
+set(JEVOIS_PLATFORM_CFLAGS " -O2 -fopenmp -I/usr/share/jevois-sdk/out/sun8iw5p1/linux/common/buildroot/build/linux-headers-3.4.113/usr/include -fPIC -Wno-deprecated-declarations -Wno-psabi ")
 
 # Host defines
 set(HOST_C_COMPILER "/usr/bin/gcc")
 set(HOST_CXX_COMPILER "/usr/bin/g++")
 set(HOST_ARCH_FLAGS "")
-set(HOST_CFLAGS " -fPIC -Wno-deprecated-declarations -Wno-psabi ")
+set(HOST_CFLAGS " -fopenmp -O2 -fPIC -Wno-deprecated-declarations -Wno-psabi ")
 
 set(CMAKE_SYSTEM_NAME Linux)
 if(JEVOIS_PLATFORM)
