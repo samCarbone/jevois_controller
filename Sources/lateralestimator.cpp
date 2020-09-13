@@ -1,20 +1,34 @@
 #include "lateralestimator.h"
 
+LateralEstimator::LateralEstimator()
+{
+    std::random_device rd; 
+    gen = new std::mt19937(rd());
+}
+
+LateralEstimator::~LateralEstimator() 
+{
+    delete gen;
+}
+
 void LateralEstimator::prior_ransac(const Eigen::VectorXd &Dt,
                 const Eigen::VectorXd &Dx,
                 const unsigned int iter, /* Number of iterations */
-                const double sigma_thresh,  /* Threshold for squared error for a point to be included */
-                const unsigned int select_n, /* Number of points used to create the model in each iteration */
-                Eigen::Matrix<double, 2, 2> &P, /* Penalty matrix */
+                const double sigma_thresh,  /* Threshold for error magnitude for a point to be included */
+                unsigned int select_n, /* Number of points used to create the model in each iteration */
+                const Eigen::Matrix<double, 2, 2> &P, /* Penalty matrix */
                 double &x_off, double &v_off, /* Output offsets */
                 bool &valid, /* Whether a valid model was found */
-                const unsigned int min_num_matched=0, /* Minimum number of points which must be matched for the model to be valid */
+                const unsigned int min_num_matched /* Minimum number of points which must be matched for the model to be valid */
                 ) 
 {
 
     // The minimum summed error for the iterations
     double epsilon_min = 0;
     bool error_set = false;
+    valid = false;
+    x_off = 0;
+    v_off = 0;
 
     // Declare matrices/vectors
     size_t max_len = Dx.size() <= Dt.size() ? Dx.size() : Dt.size();
@@ -23,10 +37,11 @@ void LateralEstimator::prior_ransac(const Eigen::VectorXd &Dt,
     std::iota(indices.begin(), indices.end(), 0); 
     Eigen::VectorXd Dx_sample(select_n);
     Eigen::VectorXd Dt_sample(select_n);
-    Eigen::MatrixXd::Ones(select_n, 2) X;
-    Eigen::VectorXd b(2)
+    Eigen::MatrixXd X(select_n, 2);
+    X.setOnes(select_n, 2);
+    Eigen::VectorXd b(2);
     Eigen::VectorXd coeffs(2);
-    std::random_device rd; std::mt19937 g(rd());
+    
 
     for(unsigned int it=0; it<iter; it++) {
 
@@ -38,10 +53,10 @@ void LateralEstimator::prior_ransac(const Eigen::VectorXd &Dt,
         */
 
         // Array of randomly shuffled indices
-        std::shuffle(indices.begin(), indices.end(), g);
+        std::shuffle(indices.begin(), indices.end(), *gen);
 
         // Shuffle the input vectors and cut to size select_n
-        for(size_t j=0; j<select_n; j++) {
+        for(unsigned int j=0; j<select_n; j++) {
             Dx_sample(j) = Dx(indices.at(j));
             Dt_sample(j) = Dt(indices.at(j));
         }
@@ -63,12 +78,12 @@ void LateralEstimator::prior_ransac(const Eigen::VectorXd &Dt,
         double epsilon_it = 0;
         unsigned int num_matched = 0;
         
-        for(size_t j=0; j<Dt; j++) {
+        for(unsigned int j=0; j<Dt.size(); j++) {
             // Calculate the 2-norm of the error between the estimate and
             // actual Dx this sample
-            double epsilon_j = math.pow(coeffs(1)* D_t(j) + coeffs(0) - D_x(j),2);
+            double epsilon_j = pow(coeffs(1)* Dt(j) + coeffs(0) - Dx(j),2);
             // Add to the total error for this iteration
-            if(epsilon_j > math.pow(sigma_th,2) { epsilon_it += sigma_th; }
+            if(epsilon_j > pow(sigma_thresh,2)) { epsilon_it += sigma_thresh; }
             else { 
                 epsilon_it += epsilon_j; 
                 num_matched += 1;

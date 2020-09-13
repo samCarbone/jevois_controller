@@ -34,11 +34,4 @@ int main(int argc, char* argv[])
     Conductor *my_object = new Conductor(file_name, baud_rate);
 
 
-    // // Set serial port params back to the original
-    // if (tcsetattr(serial_port, TCSANOW, &tty_original) != 0) {
-    //     std::cerr << "Error " << errno << " from tcsetattr: "
-    //     << strerror(errno) << std::endl;
-    // }
-    //
-    // close(serial_port);
 }

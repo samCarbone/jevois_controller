@@ -40,19 +40,19 @@ public:
     // a validity flag
 
     // 
+    std::mt19937 * gen;
 
-    static void prior_ransac(const Eigen::VectorXd &Dt,
+    void prior_ransac(const Eigen::VectorXd &Dt,
                     const Eigen::VectorXd &Dx,
                     const unsigned int iter, /* Number of iterations */
                     const double sigma_thresh,  /* Threshold for squared error for a point to be included */
-                    const unsigned int select_n, /* Number of points used to create the model in each iteration */
-                    Eigen::Matrix<double, 2, 2> &P, /* Penalty matrix */
+                    unsigned int select_n, /* Number of points used to create the model in each iteration */
+                    const Eigen::Matrix<double, 2, 2> &P, /* Penalty matrix */
                     double &x_off, double &v_off, /* Output offsets */
                     bool &valid, /* Whether a valid model was found */
-                    const unsigned int min_num_matched=0, /* Minimum number of points which must be matched for the model to be valid */
+                    const unsigned int min_num_matched=0 /* Minimum number of points which must be matched for the model to be valid */
                     );
     
-
 
 };
 
