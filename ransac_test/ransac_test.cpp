@@ -24,17 +24,17 @@ int main()
 
     // truth values
     std::vector<double> x(n);
-    for(int i=0; i<x.size(); i++) {
+    for(unsigned int i=0; i<x.size(); i++) {
         x.at(i) = i/10.0;
     }
     std::vector<double> y(n);
-    for(int i=0; i<y.size(); i++) {
+    for(unsigned int i=0; i<y.size(); i++) {
         y.at(i) = m*x.at(i) + c;
     }
 
     // Simulate measurements
     // Make a random selection from the x vector
-    int num_samples = 20;
+    unsigned int num_samples = 20;
     num_samples = num_samples <= n ? num_samples : n;
     std::vector<double> x_meas(n);
     x_meas = x;
@@ -43,7 +43,7 @@ int main()
     x_meas.erase(x_meas.begin()+num_samples, x_meas.end());
     
     std::vector<double> y_meas(num_samples);
-    for(int i=0; i<y_meas.size(); i++) {
+    for(unsigned int i=0; i<y_meas.size(); i++) {
         y_meas.at(i) = m*x_meas.at(i)+c;
     }
 
@@ -57,7 +57,7 @@ int main()
     outlier_indices.erase(outlier_indices.begin()+num_outliers, outlier_indices.end());
     std::uniform_int_distribution<> distribute_sign( 1, 2 );
     std::uniform_real_distribution<> distribute_real( 0,  outlier_mag);
-    for(int i=0; i<outlier_indices.size(); i++) {
+    for(unsigned int i=0; i<outlier_indices.size(); i++) {
         y_meas.at(outlier_indices.at(i)) += distribute_sign(gen)*distribute_real(gen);
     }
 
@@ -75,7 +75,7 @@ int main()
     coeffs = (X2.transpose()*X2).colPivHouseholderQr().solve(b);
     std::vector<double> y_ls(x.size());
     
-    for(int i=0; i<y_ls.size(); i++) {
+    for(unsigned int i=0; i<y_ls.size(); i++) {
         y_ls.at(i) = coeffs(1)*x.at(i) + coeffs(0);
     }
 
@@ -93,7 +93,7 @@ int main()
     LateralEstimator estimator;
     estimator.prior_ransac(x_meas_e, y_meas_e, 100, sigma_thresh, select_n, P, c_est, m_est, valid, 0);
     std::vector<double> y_ran(x.size());
-    for(int i=0; i<y_ran.size(); i++) {
+    for(unsigned int i=0; i<y_ran.size(); i++) {
         y_ran.at(i) = m_est*x.at(i) + c_est;
     }
 

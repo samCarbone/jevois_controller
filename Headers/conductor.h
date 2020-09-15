@@ -22,6 +22,7 @@
 #include "my_enums.h"
 #include "altitudeestimator.h"
 #include "altitudecontroller.h"
+#include "lateralestimator.h"
 
 using json = nlohmann::json;
 
@@ -111,6 +112,7 @@ private:
     // Control system
     AltitudeController* alt_controller;
     AltitudeEstimator* alt_estimator;
+    LateralEstimator* lateral_estimator;
 
     // File Methods
     bool open_files(); //

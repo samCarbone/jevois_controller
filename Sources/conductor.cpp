@@ -34,6 +34,7 @@ Conductor::Conductor(std::string serial_port_name, unsigned int baud_rate)
     // Altitude controller
     alt_controller = new AltitudeController();
     alt_estimator = new AltitudeEstimator();
+    lateral_estimator = new LateralEstimator();
 
     // Open files - allow for immediate recording
     #ifndef IS_HOST
@@ -66,6 +67,7 @@ Conductor::~Conductor()
     delete send_timer;
     delete alt_controller;
     delete alt_estimator;
+    delete lateral_estimator;
 }
 
 // **********************************************************
@@ -230,7 +232,7 @@ void Conductor::parse_packet(const std::vector<char> &inVec)
         }
         else if(mid == MID_MSP) {
             std::vector<unsigned char> att_data(inVec.begin()+4, inVec.end());
-            parse_euler_attitude(att_data);
+            parse_attitude_msp(att_data);
         }
         
     }
@@ -344,16 +346,15 @@ void Conductor::parse_altitude(const std::vector<unsigned char> &altData)
 void Conductor::parse_attitude_msp(const std::vector<unsigned char> &attData)
 {
     // Check the header and message length are valid
-    bool valid_header = true;
+    bool valid_header = false;
     if(attData.size() >= 5) {
         valid_header = attData.at(0) == '$' && attData.at(1) == 'M' 
                     && attData.at(2) == '>' && attData.at(3) == '6' 
                     && attData.at(4) == MSP_ATTITUDE;
     }
-    else valid_header = false;
 
     if(attData.size() != 12 || !valid_header) {
-        pub_log_check("Invalid attitude packet", LL_ERROR, true);
+        pub_log_check("Invalid attitude msp packet", LL_ERROR, true);
         return;
     }
 
@@ -363,7 +364,7 @@ void Conductor::parse_attitude_msp(const std::vector<unsigned char> &attData)
     pitch = (std::uint16_t)attData.at(7) | (std::uint16_t)attData.at(8) << 8; // [-900 : 900] 1/10 deg
     yaw = (std::uint16_t)attData.at(9) | (std::uint16_t)attData.at(10) << 8; // [-180 : 180] deg
 
-    // Do something with the attitude...
+    lateral_estimator->add_attitude(roll, pitch, yaw);
 
 }
 
