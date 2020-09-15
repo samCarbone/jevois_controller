@@ -58,7 +58,7 @@ int main()
     std::uniform_int_distribution<> distribute_sign( 1, 2 );
     std::uniform_real_distribution<> distribute_real( 0,  outlier_mag);
     for(unsigned int i=0; i<outlier_indices.size(); i++) {
-        y_meas.at(outlier_indices.at(i)) += distribute_sign(gen)*distribute_real(gen);
+        y_meas.at(outlier_indices.at(i)) += (distribute_sign(gen)*2-3)*distribute_real(gen);
     }
 
     // Convert to Eigen vectors

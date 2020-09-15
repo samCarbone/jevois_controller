@@ -363,8 +363,13 @@ void Conductor::parse_attitude_msp(const std::vector<unsigned char> &attData)
     roll = (std::uint16_t)attData.at(5) | (std::uint16_t)attData.at(6) << 8; // [-1800 : 1800] 1/10 deg
     pitch = (std::uint16_t)attData.at(7) | (std::uint16_t)attData.at(8) << 8; // [-900 : 900] 1/10 deg
     yaw = (std::uint16_t)attData.at(9) | (std::uint16_t)attData.at(10) << 8; // [-180 : 180] deg
+    long int time_ms = time_elapsed_ms();
 
-    lateral_estimator->add_attitude(roll, pitch, yaw);
+    AltState_t alt_state = alt_estimator->getStateEstimate();
+    if(!alt_state.valid) {
+        pub_log_check("IMU value received before altitude", LL_WARN, true);
+    }
+    lateral_estimator->add_attitude(roll, pitch, yaw, alt_state.z, time_ms);
 
 }
 
@@ -417,6 +422,7 @@ void Conductor::set_controller_activity(const bool is_active)
         landing = false;
         controller_activity = is_active;
         alt_controller->resetState();
+        lateral_estimator->reset();
 
         if(is_active) {
             // Make a better way of setting the target
@@ -455,14 +461,6 @@ void Conductor::set_landing(bool is_landing)
 
 void Conductor::send_mode(const bool active)
 {
-    // json send_doc;
-    // send_doc["snd"] = "jv";
-    // send_doc["dst"] = "pc";
-    // send_doc["typ"] = "mode";
-    // send_doc["mode"] = active ? 1 : 2; // TODO: change to enum
-
-    // // Echo the json packet
-    // std::string s = send_doc.dump();
 
     std::vector<char> send_data = { SRC_JV, DST_PC, MID_MODE, RSP_FALSE, active ? JV_CTRL_ENA : JV_CTRL_DIS};
     send_payload(send_data);
@@ -470,14 +468,6 @@ void Conductor::send_mode(const bool active)
 
 void Conductor::send_landing(const bool active)
 {
-    // json send_doc;
-    // send_doc["snd"] = "jv";
-    // send_doc["dst"] = "pc";
-    // send_doc["typ"] = "land";
-    // send_doc["land"] = active ? 1 : 2; // TODO: change to enum
-
-    // // Echo the json packet
-    // std::string s = send_doc.dump();
 
     std::vector<char> send_data = { SRC_JV, DST_PC, MID_LAND, RSP_FALSE, active ? JV_LAND_ENA : JV_LAND_DIS};
     send_payload(send_data);
@@ -571,13 +561,6 @@ void Conductor::timer_handler(const boost::system::error_code& error)
 void Conductor::send_channels(const std::array<double, 16> &channels, const bool response)
 {
 
-    // auto current_time = std::chrono::steady_clock::now();
-    // std::string write_str;
-    // std::ostringstream os;
-    // os << "Time since epoch: " << (int)std::chrono::duration_cast<std::chrono::milliseconds>(current_time.time_since_epoch()).count() << " ms\r\n";
-    // write_str = os.str();
-    // prev_jv_time = current_time;
-
     std::vector<char> msp_data;
     msp_data.reserve(6+2*channels.size());
     char message_len = static_cast<char>(2*channels.size()); // If channels.size() is greater than 63, then this will not be valid
@@ -606,16 +589,6 @@ void Conductor::send_channels(const std::array<double, 16> &channels, const bool
         checksum ^= msp_data.at(i);
     } 
     msp_data.push_back(checksum);
-
-    // Hard-code json
-    // std::string pre_string = "{\"snd\":\"pc\",\"dst\":\"fc\",\"typ\":\"msp\",\"rsp\":";
-    // pre_string += response ? "\"true\"" : "\"false\"";
-    // pre_string += ",\"ctrl\":\"true\",\"msp\":\"";
-    // std::string post_string = "\"}";
-
-    // std::vector<char> all_data(pre_string.begin(), pre_string.end());
-    // all_data.insert(all_data.end(), msp_data.begin(), msp_data.end());
-    // all_data.insert(all_data.end(), post_string.begin(), post_string.end());
 
     // Insert msp data into a new vector. Not the most efficient way, but more portable
     std::vector<char> all_data = {SRC_JV, DST_FC, MID_MSP, response ? RSP_TRUE : RSP_FALSE};
@@ -694,6 +667,7 @@ bool Conductor::open_files()
     status &= file_sig.is_open();
     status &= alt_estimator->open_files();
     status &= alt_controller->open_files();
+    status &= lateral_estimator->open_files();
 
     files_open = status;
 
@@ -707,6 +681,7 @@ void Conductor::close_files()
     file_log.close();
     alt_estimator->close_files();
     alt_controller->close_files();
+    lateral_estimator->close_files();
     files_open = false;
 }
 
@@ -715,6 +690,7 @@ void Conductor::set_file_suffix(std::string suffix_in)
     suffix = suffix_in;
     alt_estimator->set_file_suffix(suffix);
     alt_controller->set_file_suffix(suffix);
+    lateral_estimator->set_file_suffix(suffix);
 }
 
 std::string Conductor::get_file_suffix()
@@ -727,6 +703,7 @@ void Conductor::set_file_directory(std::string directory_in)
     file_directory = directory_in;
     alt_estimator->set_file_directory(directory_in);
     alt_controller->set_file_directory(directory_in);
+    lateral_estimator->set_file_directory(directory_in);
 }
 
 std::string Conductor::get_file_directory()

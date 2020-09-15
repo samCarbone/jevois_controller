@@ -10,6 +10,7 @@
 #include <algorithm>
 #include <vector>
 #include <deque>
+#include <fstream>
 #include "def.h"
 
 class LateralEstimator
@@ -40,6 +41,14 @@ public:
                     bool &valid, /* Whether a valid model was found */
                     const unsigned int min_num_matched=0 /* Minimum number of points which must be matched for the model to be valid */
                     );
+
+    // File save methods
+    bool open_files();
+    void close_files();
+    void set_file_suffix(std::string suffix_in);
+    std::string get_file_suffix();
+    void set_file_directory(std::string directory_in);
+    std::string get_file_directory();
                     
 private:
     // True once there is a measurement
@@ -89,11 +98,24 @@ private:
 
     // a validity flag
 
-    // 
+    // Random number generator
     std::mt19937 * gen;
 
-    
+    // File save attributes
+    std::ofstream file_lateral_raw_imu;
+    std::ofstream file_lateral_cam;
 
+    bool files_open = false;
+    const std::string header_lateral_raw_imu = "time_ms,roll_dec,pitch_dec,yaw,z,x_raw,y_raw,vx_raw,vy_raw";
+    //
+    const std::string header_lateral_cam = "time_cap_ms,gate_obs_x,gate_obs_y,gate_obs_z,gate_orient_x,gate_orient_y,gate_orient_z,t_match_ms,roll_dec_m,pitch_dec_m,yaw_m,x_raw_m,y_raw_m,z_raw_m,vx_raw_m,vy_raw_m,t_ms_off_p,x_off_p,y_off_p,vx_off_p,vy_off_p,t_ms_off,x_off,y_off,vx_off,vy_off,n_queue,valid";
+    //
+    const std::string prefix_lateral_raw_imu = "lateral_raw_imu_";
+    const std::string prefix_lateral_cam = "lateral_cam_";
+    const std::string format = ".txt";
+    std::string suffix = "jv";
+    std::string file_directory = ".";
+    
 };
 
 #endif // LATERALESTIMATOR_H

@@ -17,6 +17,7 @@ LateralEstimator::LateralEstimator()
 
 LateralEstimator::~LateralEstimator() 
 {
+    close_files();
     delete gen;
 }
 
@@ -173,6 +174,15 @@ void LateralEstimator::add_attitude(std::uint16_t roll, std::uint16_t pitch, std
     t_ms_raw.erase(t_ms_raw.begin());
     t_ms_raw.push_back(time_ms);
 
+    // File writes
+    if(files_open) {
+        // header
+        // time_ms,roll_dec,pitch_dec,yaw,z,x_raw,y_raw,vx_raw,vy_raw
+        file_lateral_raw_imu << time_ms << "," << roll << "," << pitch << "," << yaw << "," << z << "," 
+                            << x_raw.back() << "," << y_raw.back() << "," << vx_raw.back() << "," << vy_raw.back() 
+                            << std::endl;
+    }
+
 }
 
 void LateralEstimator::add_gate_obs(Eigen::Vector3d &r_cam2gate, Eigen::Vector3d &orient_c, long int time_cap_ms)
@@ -227,7 +237,7 @@ void LateralEstimator::add_gate_obs(Eigen::Vector3d &r_cam2gate, Eigen::Vector3d
         }
     }
     if(min_error > LIMIT_CAM_TIME_DIFF_MS) {
-        std::cerr << "[error] Lateral estimator: LIMIT_CAM_TIME_DIFF_MS exceeded. Min error: " 
+        std::cerr << time_cap_ms << " [error] Lateral estimator: LIMIT_CAM_TIME_DIFF_MS exceeded. Min error: " 
                 << min_error << "ms" << std::endl;
         return;
     }
@@ -311,22 +321,40 @@ void LateralEstimator::add_gate_obs(Eigen::Vector3d &r_cam2gate, Eigen::Vector3d
     queue_x_raw.push_back(x_raw.at(i_match));
     queue_y_raw.push_back(y_raw.at(i_match));
 
+    // Copy previous offsets for file save later
+    double x_off_prev = x_off;
+    double y_off_prev = y_off;
+    double vx_off_prev = vx_off;
+    double vy_off_prev = vy_off;
+    double t_ms_off_prev = t_ms_off;
+
+    bool valid = false; 
     // Check sufficient number of elements in the queue
-    if(queue_t_ms.size() < MIN_SAMPLES_IN_WINDOW) {
-        return;
+    if(queue_t_ms.size() >= MIN_SAMPLES_IN_WINDOW) {
+
+        // Process the queue
+        double x_off_temp = 0; double vx_off_temp = 0; double y_off_temp = 0; double vy_off_temp = 0;
+        long int t_ms_off_temp = 0;
+        calc_correction(x_off_temp, vx_off_temp, y_off_temp, vy_off_temp, t_ms_off_temp, valid);
+        if(valid) {
+            x_off = x_off_temp;
+            vx_off = vx_off_temp;
+            y_off = y_off_temp;
+            vy_off = vy_off_temp;
+            t_ms_off = t_ms_off_temp;
+        }
+
     }
 
-    // Process the queue
-    double x_off_temp = 0; double vx_off_temp = 0; double y_off_temp = 0; double vy_off_temp = 0;
-    long int t_ms_off_temp = 0;
-    bool valid = false; 
-    calc_correction(x_off_temp, vx_off_temp, y_off_temp, vy_off_temp, t_ms_off_temp, valid);
-    if(valid) {
-        x_off = x_off_temp;
-        vx_off = vx_off_temp;
-        y_off = y_off_temp;
-        vy_off = vy_off_temp;
-        t_ms_off = t_ms_off_temp;
+    // File writes
+    if(files_open) {
+        // header - long, not listed here
+        //
+        file_lateral_cam << time_cap_ms << "," << r_cam2gate(0) << "," << r_cam2gate(1) << "," << r_cam2gate(2) << "," << orient_c(0) << "," << orient_c(1) << "," << orient_c(2) << ","
+                        << t_ms_raw.at(i_match) << "," << roll_d.at(i_match) << "," << pitch_d.at(i_match) << "," << yaw_d.at(i_match) << "," << x_raw.at(i_match) << "," << y_raw.at(i_match) << "," << z_raw.at(i_match) << ","
+                        << vx_raw.at(i_match) << "," << vy_raw.at(i_match) << ","
+                        << t_ms_off_prev << "," << x_off_prev << "," << y_off_prev << "," << vx_off_prev << "," << vy_off_prev << ","
+                        << t_ms_off << "," << x_off << "," << y_off << "," << vx_off << "," << vy_off << "," << queue_t_ms.size() << "," << (std::uint8_t)valid;
     }
 
 }
@@ -373,7 +401,9 @@ void LateralEstimator::calc_correction(double &_x_off, double &_vx_off, double &
         prior_ransac(Dt, Dx, iter, sigma_thresh, select_n, P, _x_off, _vx_off, valid_x, 0);
         prior_ransac(Dt, Dy, iter, sigma_thresh, select_n, P, _y_off, _vy_off, valid_y, 0);
     } catch(const std::exception& e) {
-        std::cout << "Ransac thrown exception" << e.what() << std::endl;
+        std::cerr << "Ransac thrown exception" << e.what() << std::endl;
+        valid_x = false;
+        valid_y = false;
     }
     valid = valid_x && valid_y;
     _t_ms_off = queue_t_ms.back();
@@ -473,4 +503,57 @@ void LateralEstimator::get_heading(int &_yaw_d, bool &valid)
         return;
     }
     _yaw_d = yaw_d.back(); 
+}
+
+
+// **********************************************************************
+// File Methods
+// **********************************************************************
+
+bool LateralEstimator::open_files() {
+    if(!file_lateral_raw_imu.is_open()) {
+        std::string name_lateral_raw_imu = file_directory + "/" + prefix_lateral_raw_imu + suffix + format;
+        file_lateral_raw_imu.open(name_lateral_raw_imu, std::ios::out | std::ios::app); // Append the file contents to prevent overwrite
+    }
+
+    if(!file_lateral_cam.is_open()) {
+        std::string name_lateral_cam = file_directory + "/" + prefix_lateral_cam + suffix + format;
+        file_lateral_raw_imu.open(name_lateral_cam, std::ios::out | std::ios::app); // Append the file contents to prevent overwrite
+    }
+    
+    files_open = true;
+    if(file_lateral_raw_imu.is_open()) {
+        file_lateral_raw_imu << std::endl << header_lateral_raw_imu << std::endl;
+    } else {
+        files_open = false;
+    }
+    if(file_lateral_cam.is_open()) {
+        file_lateral_cam << std::endl << header_lateral_cam << std::endl;
+    } else {
+        files_open = false;
+    }
+
+    return files_open;
+}
+
+void LateralEstimator::close_files() {
+    file_lateral_raw_imu.close();
+    files_open = false;
+}
+
+void LateralEstimator::set_file_suffix(std::string suffix_in) {
+    suffix = suffix_in;
+}
+
+std::string LateralEstimator::get_file_suffix() {
+    return suffix;
+}
+
+void LateralEstimator::set_file_directory(std::string directory_in) {
+    file_directory = directory_in;
+}
+
+std::string LateralEstimator::get_file_directory()
+{
+    return file_directory;
 }
