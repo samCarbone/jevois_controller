@@ -113,7 +113,7 @@ void LateralEstimator::prior_ransac(const Eigen::VectorXd &Dt,
 
 }
 
-void LateralEstimator::add_attitude(std::uint16_t roll, std::uint16_t pitch, std::uint16_t yaw, double z, long int time_ms)
+void LateralEstimator::add_attitude(std::int16_t roll, std::int16_t pitch, std::int16_t yaw, double z, long int time_ms)
 {
     // roll [-1800 : 1800] 1/10 deg
     // pitch [-900 : 900] 1/10 deg

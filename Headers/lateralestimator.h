@@ -20,7 +20,7 @@ public:
     
     ~LateralEstimator();
     
-    void add_attitude(std::uint16_t roll, std::uint16_t pitch, std::uint16_t yaw, double z, long int time_ms);
+    void add_attitude(std::int16_t roll, std::int16_t pitch, std::int16_t yaw, double z, long int time_ms);
 
     void add_gate_obs(Eigen::Vector3d &r_cam2gate, Eigen::Vector3d &orient_c, long int time_cap_ms);
 

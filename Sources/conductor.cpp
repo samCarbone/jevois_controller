@@ -230,10 +230,6 @@ void Conductor::parse_packet(const std::vector<char> &inVec)
             std::vector<unsigned char> alt_data(inVec.begin()+4, inVec.end());
             parse_altitude(alt_data);
         }
-        else if(mid == MID_MSP) {
-            std::vector<unsigned char> att_data(inVec.begin()+4, inVec.end());
-            parse_attitude_msp(att_data);
-        }
         
     }
     else if(src == SRC_PC) {
@@ -277,8 +273,10 @@ void Conductor::parse_packet(const std::vector<char> &inVec)
         }
     }
     else if(src == SRC_FC) {
-        if(mid == MID_MSP) {
 
+        if(mid == MID_MSP) {
+            std::vector<unsigned char> att_data(inVec.begin()+4, inVec.end());
+            parse_attitude_msp(att_data);
         }
     }
 
@@ -349,7 +347,7 @@ void Conductor::parse_attitude_msp(const std::vector<unsigned char> &attData)
     bool valid_header = false;
     if(attData.size() >= 5) {
         valid_header = attData.at(0) == '$' && attData.at(1) == 'M' 
-                    && attData.at(2) == '>' && attData.at(3) == '6' 
+                    && attData.at(2) == '>' && attData.at(3) == 6 
                     && attData.at(4) == MSP_ATTITUDE;
     }
 
@@ -359,10 +357,17 @@ void Conductor::parse_attitude_msp(const std::vector<unsigned char> &attData)
     }
 
     unsigned char crc = attData.at(3) ^ attData.at(4);
-    std::uint16_t roll, pitch, yaw;
-    roll = (std::uint16_t)attData.at(5) | (std::uint16_t)attData.at(6) << 8; // [-1800 : 1800] 1/10 deg
-    pitch = (std::uint16_t)attData.at(7) | (std::uint16_t)attData.at(8) << 8; // [-900 : 900] 1/10 deg
-    yaw = (std::uint16_t)attData.at(9) | (std::uint16_t)attData.at(10) << 8; // [-180 : 180] deg
+    std::uint16_t roll_u, pitch_u, yaw_u;
+    std::int16_t roll, pitch, yaw;
+    // Read it in as unsigned first and then convert to signed
+    // TODO: change to reading in as signed directly
+    roll_u = (std::uint16_t)attData.at(5) | (std::uint16_t)attData.at(6) << 8; // [-1800 : 1800] 1/10 deg
+    pitch_u = (std::uint16_t)attData.at(7) | (std::uint16_t)attData.at(8) << 8; // [-900 : 900] 1/10 deg
+    yaw_u = (std::uint16_t)attData.at(9) | (std::uint16_t)attData.at(10) << 8; // [-180 : 180] deg
+    roll = static_cast<std::int16_t>(roll_u);
+    pitch = -static_cast<std::int16_t>(pitch_u); // Negative to convert to RHS coordinate system
+    yaw = static_cast<std::int16_t>(yaw_u);
+
     long int time_ms = time_elapsed_ms();
 
     AltState_t alt_state = alt_estimator->getStateEstimate();
@@ -379,13 +384,16 @@ void Conductor::parse_attitude_msp(const std::vector<unsigned char> &attData)
     bool valid, warn_time;
     valid=false; warn_time=true;
     lateral_estimator->get_position(time_elapsed_ms(), x, vx, y, vy, valid, warn_time);
-    std::cout << "Time_ms: " << time_elapsed_ms() << std::fixed << std::setprecision(3)
+    std::cout << "Time_ms: " << time_elapsed_ms() << std::fixed << std::setprecision(1)
+                << ", roll: " << roll/10.0
+                << ", pitch: " << pitch/10.0
+                << ", yaw: " << yaw << std::fixed << std::setprecision(3)
                 << ", x: " << x
                 << ", y: " << y
                 << ", vx: " << vx
                 << ",  vy: " << vy
-                << "warn_time: " << warn_time
-                << "valid: " << valid
+                << ", warn_time: " << warn_time
+                << ", valid: " << valid
                 << std::endl;
     #endif
 
