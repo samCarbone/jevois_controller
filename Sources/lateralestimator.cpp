@@ -518,7 +518,7 @@ bool LateralEstimator::open_files() {
 
     if(!file_lateral_cam.is_open()) {
         std::string name_lateral_cam = file_directory + "/" + prefix_lateral_cam + suffix + format;
-        file_lateral_raw_imu.open(name_lateral_cam, std::ios::out | std::ios::app); // Append the file contents to prevent overwrite
+        file_lateral_cam.open(name_lateral_cam, std::ios::out | std::ios::app); // Append the file contents to prevent overwrite
     }
     
     files_open = true;
@@ -538,6 +538,7 @@ bool LateralEstimator::open_files() {
 
 void LateralEstimator::close_files() {
     file_lateral_raw_imu.close();
+    file_lateral_cam.close();
     files_open = false;
 }
 
