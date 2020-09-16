@@ -371,6 +371,24 @@ void Conductor::parse_attitude_msp(const std::vector<unsigned char> &attData)
     }
     lateral_estimator->add_attitude(roll, pitch, yaw, alt_state.z, time_ms);
 
+
+    #ifdef IS_HOST
+    // Print location estimate
+    double x, vx, y, vy;
+    x=0; vx=0; y=0; vy=0;
+    bool valid, warn_time;
+    valid=false; warn_time=true;
+    lateral_estimator->get_position(time_elapsed_ms(), x, vx, y, vy, valid, warn_time);
+    std::cout << "Time_ms: " << time_elapsed_ms() << std::fixed << std::setprecision(3)
+                << ", x: " << x
+                << ", y: " << y
+                << ", vx: " << vx
+                << ",  vy: " << vy
+                << "warn_time: " << warn_time
+                << "valid: " << valid
+                << std::endl;
+    #endif
+
 }
 
 
@@ -534,14 +552,14 @@ void Conductor::timer_handler(const boost::system::error_code& error)
                 pub_log_check(error_str, LL_ERROR, true);
             }
 
-            #ifdef IS_HOST
-            std::cout << "Prop-> Time esp: " << prop_alt_state.timeEsp_ms
-                        << ", Time pc: " << prop_alt_state.timePc_ms
-                        << std::fixed << std::setprecision(4) << ", z: " << prop_alt_state.z
-                        << ", \tz_dot: " << prop_alt_state.z_dot;
-            std::cout   << ",  \tchn_thr: " << chn_thr
-                        << std::endl;
-            #endif
+            // #ifdef IS_HOST
+            // std::cout << "Prop-> Time esp: " << prop_alt_state.timeEsp_ms
+            //             << ", Time pc: " << prop_alt_state.timePc_ms
+            //             << std::fixed << std::setprecision(4) << ", z: " << prop_alt_state.z
+            //             << ", \tz_dot: " << prop_alt_state.z_dot;
+            // std::cout   << ",  \tchn_thr: " << chn_thr
+            //             << std::endl;
+            // #endif
 
             if(files_open) {
                 // header

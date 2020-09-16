@@ -19,8 +19,8 @@ if(JEVOIS_PLATFORM)
     set(CMAKE_SYSTEM_PROCESSOR arm)
     set(CMAKE_C_COMPILER ${JEVOIS_PLATFORM_C_COMPILER})
     set(CMAKE_CXX_COMPILER ${JEVOIS_PLATFORM_CXX_COMPILER})
-    set(CMAKE_C_FLAGS "-std=gnu99 -W -Wno-attribute-warning ${JEVOIS_PLATFORM_ARCH_FLAGS} ${JEVOIS_PLATFORM_CFLAGS}")
-    set(CMAKE_CXX_FLAGS " -W -Wno-attribute-warning ${JEVOIS_PLATFORM_ARCH_FLAGS} ${JEVOIS_PLATFORM_CFLAGS}")
+    set(CMAKE_C_FLAGS "-std=gnu99 -W ${JEVOIS_PLATFORM_ARCH_FLAGS} ${JEVOIS_PLATFORM_CFLAGS}")
+    set(CMAKE_CXX_FLAGS " -W ${JEVOIS_PLATFORM_ARCH_FLAGS} ${JEVOIS_PLATFORM_CFLAGS}")
     set(BOOST_LIBRARIES, "/usr/share/jevois-sdk/out/sun8iw5p1/linux/common/buildroot/host/arm-buildroot-linux-gnueabihf/sysroot/usr/include/boost")
     message(STATUS "Compiling for Jevois platform")
 else()
@@ -54,8 +54,8 @@ add_subdirectory(json)
 INCLUDE_DIRECTORIES(${PROJECT_SOURCE_DIR}/CRCpp/inc/)
 
 # add the executables
-set(SOURCES Sources/main.cpp Sources/conductor.cpp Sources/altitudeestimator.cpp Sources/altitudecontroller.cpp)
-set(HEADERS Headers/conductor.h Headers/altitudeestimator.h Headers/altitudecontroller.h Headers/def.h Headers/my_enums.h CRCpp/inc/CRC.h)
+set(SOURCES Sources/main.cpp Sources/conductor.cpp Sources/altitudeestimator.cpp Sources/altitudecontroller.cpp Sources/lateralestimator.cpp)
+set(HEADERS Headers/conductor.h Headers/altitudeestimator.h Headers/altitudecontroller.h Headers/def.h Headers/my_enums.h CRCpp/inc/CRC.h Headers/lateralestimator.h)
 add_executable(Main ${SOURCES} ${HEADERS})
 
 # link libraries
