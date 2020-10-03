@@ -113,7 +113,7 @@ void LateralEstimator::prior_ransac(const Eigen::VectorXd &Dt,
 
 }
 
-void LateralEstimator::add_attitude(std::int16_t roll, std::int16_t pitch, std::int16_t yaw, double z, long int time_ms)
+void LateralEstimator::add_attitude(const std::int16_t roll, const std::int16_t pitch, const std::int16_t yaw, const double z, const long int time_ms)
 {
     // roll [-1800 : 1800] 1/10 deg
     // pitch [-900 : 900] 1/10 deg
@@ -185,7 +185,7 @@ void LateralEstimator::add_attitude(std::int16_t roll, std::int16_t pitch, std::
 
 }
 
-void LateralEstimator::add_gate_obs(Eigen::Vector3d &r_cam2gate, Eigen::Vector3d &orient_c, long int time_cap_ms)
+void LateralEstimator::add_gate_obs(const Eigen::Vector3d &r_cam2gate, const Eigen::Vector3d &orient_c, const long int time_cap_ms)
 {
 
     // SAFE TO RUN IN PARALLEL
