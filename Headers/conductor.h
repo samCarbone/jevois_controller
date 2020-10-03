@@ -15,6 +15,9 @@
 #include <boost/asio/serial_port.hpp>
 #include <boost/asio/high_resolution_timer.hpp>
 #include <boost/date_time/posix_time/posix_time.hpp>
+#include <boost/interprocess/mapped_region.hpp>
+#include <boost/interprocess/shared_memory_object.hpp>
+#include <bootstrap.h/interprocess/sync/named_semaphore.hpp>
 #include <nlohmann/json.hpp>
 #include <CRC.h>
 
@@ -25,6 +28,7 @@
 #include "lateralestimator.h"
 
 using json = nlohmann::json;
+using namespace boost::interprocess;
 
 enum msg_type {IDLE_W, SOF_A, LEN_LO, PAYLOAD, CRC_HI, CRC_LO, VALID};
 
@@ -57,6 +61,14 @@ private:
     // Boost timer
     void sendTimerDone();
     const long int PROP_LIMIT = 100;
+
+    // Boost IPC
+    named_semaphore * sem_filled;
+    named_semaphore * sem_empty;
+    shared_memory_object * segment;
+    mapped_region * memregion;
+    cam_ipc_data_t * cam_data;
+
 
 
     // Channels
