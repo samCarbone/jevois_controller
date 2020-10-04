@@ -392,7 +392,6 @@ void Conductor::parse_attitude_msp(const std::vector<unsigned char> &attData)
     Eigen::Vector3d r_cam2gate, orient_c;
     r_cam2gate(0) = translation.at(0); r_cam2gate(1) = translation.at(1); r_cam2gate(2) = translation.at(3);
     orient_c(0) = rotation.at(0); orient_c(1) = rotation.at(1); orient_c(2) = rotation.at(2);
-
     lateral_estimator->add_gate_obs(r_cam2gate, orient_c, proc_time);
 
     #ifdef IS_HOST
@@ -621,6 +620,18 @@ void Conductor::timer_handler(const boost::system::error_code& error)
         }
 
     }
+
+
+    // This is placed here so that the camera observations will update even if no serial message is received
+    // Update camera observations
+    std::array<double,3> rotation, translation;
+    long int proc_time;
+    get_cam_data(rotation, translation, proc_time);
+    Eigen::Vector3d r_cam2gate, orient_c;
+    r_cam2gate(0) = translation.at(0); r_cam2gate(1) = translation.at(1); r_cam2gate(2) = translation.at(3);
+    orient_c(0) = rotation.at(0); orient_c(1) = rotation.at(1); orient_c(2) = rotation.at(2);
+    lateral_estimator->add_gate_obs(r_cam2gate, orient_c, proc_time);
+
 
 }
 
