@@ -388,11 +388,12 @@ void Conductor::parse_attitude_msp(const std::vector<unsigned char> &attData)
     // Update camera observations
     std::array<double,3> rotation, translation;
     long int proc_time;
-    get_cam_data(rotation, translation, proc_time);
-    Eigen::Vector3d r_cam2gate, orient_c;
-    r_cam2gate(0) = translation.at(0); r_cam2gate(1) = translation.at(1); r_cam2gate(2) = translation.at(3);
-    orient_c(0) = rotation.at(0); orient_c(1) = rotation.at(1); orient_c(2) = rotation.at(2);
-    lateral_estimator->add_gate_obs(r_cam2gate, orient_c, proc_time);
+    if(get_cam_data(rotation, translation, proc_time)) {
+        Eigen::Vector3d r_cam2gate, orient_c;
+        r_cam2gate(0) = translation.at(0); r_cam2gate(1) = translation.at(1); r_cam2gate(2) = translation.at(3);
+        orient_c(0) = rotation.at(0); orient_c(1) = rotation.at(1); orient_c(2) = rotation.at(2);
+        lateral_estimator->add_gate_obs(r_cam2gate, orient_c, proc_time);
+    }
 
     #ifdef IS_HOST
     // Print location estimate
@@ -423,7 +424,7 @@ void Conductor::parse_attitude_msp(const std::vector<unsigned char> &attData)
 // **********************************************************
 
 
-void Conductor::get_cam_data(std::array<double,3> &rotation, std::array<double,3> &translation, long int &proc_time)
+bool Conductor::get_cam_data(std::array<double,3> &rotation, std::array<double,3> &translation, long int &proc_time)
 {
     // Check if the data is available
     if(sem_filled->try_wait()) {
@@ -433,7 +434,11 @@ void Conductor::get_cam_data(std::array<double,3> &rotation, std::array<double,3
         proc_time = cam_data->proc_time;
         // Notify we are done with the data
         sem_empty->post();
+
+        return true;
     }
+    
+    return false;
 }
 
 
@@ -626,11 +631,12 @@ void Conductor::timer_handler(const boost::system::error_code& error)
     // Update camera observations
     std::array<double,3> rotation, translation;
     long int proc_time;
-    get_cam_data(rotation, translation, proc_time);
-    Eigen::Vector3d r_cam2gate, orient_c;
-    r_cam2gate(0) = translation.at(0); r_cam2gate(1) = translation.at(1); r_cam2gate(2) = translation.at(3);
-    orient_c(0) = rotation.at(0); orient_c(1) = rotation.at(1); orient_c(2) = rotation.at(2);
-    lateral_estimator->add_gate_obs(r_cam2gate, orient_c, proc_time);
+    if(get_cam_data(rotation, translation, proc_time)) {
+        Eigen::Vector3d r_cam2gate, orient_c;
+        r_cam2gate(0) = translation.at(0); r_cam2gate(1) = translation.at(1); r_cam2gate(2) = translation.at(3);
+        orient_c(0) = rotation.at(0); orient_c(1) = rotation.at(1); orient_c(2) = rotation.at(2);
+        lateral_estimator->add_gate_obs(r_cam2gate, orient_c, proc_time);
+    }
 
 
 }

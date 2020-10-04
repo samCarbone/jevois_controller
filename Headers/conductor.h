@@ -68,7 +68,7 @@ private:
     shared_memory_object * segment;
     mapped_region * memregion;
     cam_ipc_data_t * cam_data;
-    void get_cam_data(std::array<double,3> &rotation, std::array<double,3> &translation, long int &proc_time);
+    bool get_cam_data(std::array<double,3> &rotation, std::array<double,3> &translation, long int &proc_time);
 
     // Channels
     static constexpr double MAX_CHANNEL_VALUE = 100;
