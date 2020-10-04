@@ -5,6 +5,7 @@
 # && stty -F /dev/ttyS0 -a > /dev/ttyS0 \
 
 save_state=$(stty -g) \
+&& sleep 2 \
 && stty -F /dev/ttyS0 57600 -echo -echoe -echoctl -echoke raw \
 && echo -e "\r\nStarted [REMOVE]\r\n" > /dev/ttyS0 \
 && echo -e "********START ERR LOG*********" > /jevois/scripts/logs/err_log.txt \
