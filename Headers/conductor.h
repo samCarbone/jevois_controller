@@ -69,8 +69,6 @@ private:
     mapped_region * memregion;
     cam_ipc_data_t * cam_data;
 
-
-
     // Channels
     static constexpr double MAX_CHANNEL_VALUE = 100;
     static constexpr double MIN_CHANNEL_VALUE = -100;
