@@ -427,13 +427,13 @@ void Conductor::parse_attitude_msp(const std::vector<unsigned char> &attData)
 void Conductor::get_cam_data(std::array<double,3> &rotation, std::array<double,3> &translation, long int &proc_time)
 {
     // Check if the data is available
-    if(sem_filled.try_wait()) {
+    if(sem_filled->try_wait()) {
         // Read the data
         std::copy(std::begin(cam_data->rotation), std::end(cam_data->rotation), rotation.begin());
         std::copy(std::begin(cam_data->translation), std::end(cam_data->translation), translation.begin());
         proc_time = cam_data->proc_time;
         // Notify we are done with the data
-        sem_empty.post();
+        sem_empty->post();
     }
 }
 
