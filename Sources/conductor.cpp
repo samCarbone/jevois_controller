@@ -35,7 +35,7 @@ Conductor::Conductor(std::string serial_port_name, unsigned int baud_rate)
     sem_filled = new named_semaphore(open_only, "SemFilledCam"); // Semaphore for new data ready
     sem_empty = new named_semaphore(open_only, "SemEmptyCam"); // Semaphore for drone reading data
     segment = new shared_memory_object(open_only, "SharedMemoryCam", read_write);
-    memregion = new mapped_region(segment, read_write);
+    memregion = new mapped_region(*segment, read_write);
     void * memaddr = memregion->get_address();
     cam_data = static_cast<cam_ipc_data_t*>(memaddr);
 
