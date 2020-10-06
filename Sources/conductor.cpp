@@ -439,6 +439,12 @@ bool Conductor::get_cam_data(std::array<double,3> &rotation, std::array<double,3
         // Notify we are done with the data
         sem_empty->post();
 
+        // Check if this is a starting prompt
+        if(proc_time == -500) { 
+            pub_log_check("Cam connected", LL_INFO, true);
+            return false;
+        }
+
         return true;
     }
     
