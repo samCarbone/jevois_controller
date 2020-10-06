@@ -389,10 +389,14 @@ void Conductor::parse_attitude_msp(const std::vector<unsigned char> &attData)
     std::array<double,3> rotation, translation;
     long int proc_time;
     if(get_cam_data(rotation, translation, proc_time)) {
+
         Eigen::Vector3d r_cam2gate, orient_c;
-        r_cam2gate(0) = translation.at(0); r_cam2gate(1) = translation.at(1); r_cam2gate(2) = translation.at(3);
+        r_cam2gate(0) = translation.at(0); r_cam2gate(1) = translation.at(1); r_cam2gate(2) = translation.at(2);
         orient_c(0) = rotation.at(0); orient_c(1) = rotation.at(1); orient_c(2) = rotation.at(2);
-        lateral_estimator->add_gate_obs(r_cam2gate, orient_c, proc_time);
+        long int cap_time = time_elapsed_ms() - proc_time;
+        cap_time = cap_time > 0 ? cap_time : 0;
+        lateral_estimator->add_gate_obs(r_cam2gate, orient_c, cap_time);
+
     }
 
     #ifdef IS_HOST
@@ -632,12 +636,24 @@ void Conductor::timer_handler(const boost::system::error_code& error)
     std::array<double,3> rotation, translation;
     long int proc_time;
     if(get_cam_data(rotation, translation, proc_time)) {
-        Eigen::Vector3d r_cam2gate, orient_c;
-        r_cam2gate(0) = translation.at(0); r_cam2gate(1) = translation.at(1); r_cam2gate(2) = translation.at(3);
-        orient_c(0) = rotation.at(0); orient_c(1) = rotation.at(1); orient_c(2) = rotation.at(2);
-        lateral_estimator->add_gate_obs(r_cam2gate, orient_c, proc_time);
-    }
 
+        Eigen::Vector3d r_cam2gate, orient_c;
+        r_cam2gate(0) = translation.at(0); r_cam2gate(1) = translation.at(1); r_cam2gate(2) = translation.at(2);
+        orient_c(0) = rotation.at(0); orient_c(1) = rotation.at(1); orient_c(2) = rotation.at(2);
+        long int cap_time = time_elapsed_ms() - proc_time;
+        cap_time = cap_time > 0 ? cap_time : 0;
+        lateral_estimator->add_gate_obs(r_cam2gate, orient_c, cap_time);
+
+        #ifdef IS_HOST
+        // Print cam data -- assuming the IMU data is not coming in
+        // Print the data
+        std::cout << "Translation: " << std::fixed << std::setprecision(2)
+        << "x: " << translation[0] << ", y: " << translation[1] << ", z: " << translation[2]
+        << ", Rotation: " << std::fixed << std::setprecision(2)
+        << "rx: " << rotation[0] << ", ry: " << rotation[1] << ", rz: " << rotation[2] << std::endl;
+        #endif
+
+    }
 
 }
 
