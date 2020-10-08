@@ -354,7 +354,7 @@ void LateralEstimator::add_gate_obs(const Eigen::Vector3d &r_cam2gate, const Eig
                         << t_ms_raw.at(i_match) << "," << roll_d.at(i_match) << "," << pitch_d.at(i_match) << "," << yaw_d.at(i_match) << "," << x_raw.at(i_match) << "," << y_raw.at(i_match) << "," << z_raw.at(i_match) << ","
                         << vx_raw.at(i_match) << "," << vy_raw.at(i_match) << ","
                         << t_ms_off_prev << "," << x_off_prev << "," << y_off_prev << "," << vx_off_prev << "," << vy_off_prev << ","
-                        << t_ms_off << "," << x_off << "," << y_off << "," << vx_off << "," << vy_off << "," << queue_t_ms.size() << "," << (std::uint8_t)valid;
+                        << t_ms_off << "," << x_off << "," << y_off << "," << vx_off << "," << vy_off << "," << queue_t_ms.size() << "," << (int)valid << std::endl;
     }
 
 }
