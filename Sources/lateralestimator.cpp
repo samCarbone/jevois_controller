@@ -348,34 +348,34 @@ void LateralEstimator::add_gate_obs(const Eigen::Vector3d &r_cam2gate, const Eig
     }
 
     /* Quantities saved to file
-    time_cap_ms : time (pc) at which frame was captured
-    gate_obs_x: x of gate in camera frame
-    gate_obs_y: y of gate in camera frame
-    gate_obs_z: z of gate in camera frame
-    gate_orient_x: x component of gate orientation vector in camera frame
-    gate_orient_y: y component of gate orientation vector in camera frame
-    gate_orient_z: z component of gate orientation vector in camera frame
-    t_match_ms: IMU capture time (PC) which is closest to the camera capture time
-    roll_dec_m: IMU roll (1/10deg) for matched time
-    pitch_dec_m: IMU pitch (1/10deg) for matched time
-    yaw_m: IMU yaw for matched time
-    x_raw_m: raw (uncorrected) x for the matched time
-    y_raw_m: raw (uncorrected) y for the matched time
-    z_raw_m: z for the matched time
-    vx_raw_m: raw (uncorrected) velocity x for the matched time
-    vy_raw_m: raw (uncorrected) velocity y for the matched time
-    t_ms_off_p: previous - time of the offset
-    x_off_p: previous x offset
-    y_off_p: previous y offset
-    vx_off_p: previous vx offset
-    vy_off_p: previous vy offset
-    t_ms_off: time of the offset
-    x_off: x offset
-    y_off: y offset
-    vx_off: vx offset
-    vy_off: vy offset
+    time_cap_ms : time (pc) at which frame was captured (ms)
+    gate_obs_x: x of gate in camera frame (m)
+    gate_obs_y: y of gate in camera frame (m)
+    gate_obs_z: z of gate in camera frame (m)
+    gate_orient_x: x component of gate orientation vector in camera frame (unit)
+    gate_orient_y: y component of gate orientation vector in camera frame (unit)
+    gate_orient_z: z component of gate orientation vector in camera frame (unit)
+    t_match_ms: IMU capture time (PC) which is closest to the camera capture time (ms)
+    roll_dec_m: IMU roll for matched time (*1/10deg)
+    pitch_dec_m: IMU pitch for matched time (*1/10deg)
+    yaw_m: IMU yaw for matched time (deg)
+    x_raw_m: raw (uncorrected) x for the matched time (m)
+    y_raw_m: raw (uncorrected) y for the matched time (m)
+    z_raw_m: z for the matched time (m)
+    vx_raw_m: raw (uncorrected) velocity x for the matched time (m/s)
+    vy_raw_m: raw (uncorrected) velocity y for the matched time (m/s)
+    t_ms_off_p: previous - time of the offset (ms)
+    x_off_p: previous x offset (m)
+    y_off_p: previous y offset (m)
+    vx_off_p: previous vx offset (m/s)
+    vy_off_p: previous vy offset (m/s)
+    t_ms_off: time of the offset (ms)
+    x_off: x offset (m)
+    y_off: y offset (m) 
+    vx_off: vx offset (m/s)
+    vy_off: vy offset (m/s)
     n_queue: number of matched frames in the queue
-    valid: whether a correction was calculated for this frame/current queue is valid
+    valid: whether a correction was calculated for this frame/current queue is valid (1 true / 0 false)
     */
 
 
