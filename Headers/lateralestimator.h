@@ -2,6 +2,7 @@
 #define LATERALESTIMATOR_H
 
 #include <../eigen/Eigen/Dense>
+#include <../eigen/Eigen/Geometry>
 #include <iostream>
 #include <cmath>
 #include <cstdint>
@@ -79,6 +80,8 @@ private:
     const std::vector<double> gates_orient_y = {0};
     const std::vector<double> gates_orient_z = {0};
 
+    const double POS_ERROR_LIMIT_MAX = 2; // m
+
     std::deque<long int> queue_t_ms;
     std::deque<double> queue_x_meas;
     std::deque<double> queue_x_raw;
@@ -93,6 +96,10 @@ private:
     static void DCM_Cbe(const double phi, const double theta, const double psi, Eigen::Matrix<double,3,3> &DCM);
 
     void calc_correction(double &_x_off, double &_vx_off, double &_y_off, double &_vy_off, long int &_t_ms_off, bool &valid);
+
+    static void calc_vec_z_rotation(const Eigen::Vector3d &a, /* True gate orientation vector in Earth frame */
+                                        const Eigen::Vector3d &b, /* Observed gate orientation vector in Earth frame */
+                                        double &theta /* True gate yaw - observed gate yaw */);
 
     // a mutex to control writes
 
