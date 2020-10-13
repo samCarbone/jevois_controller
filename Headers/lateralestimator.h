@@ -72,6 +72,9 @@ private:
     double vy_off = 0;
     long int t_ms_off = 0;
 
+    // yaw_true = yaw_raw + yaw_off
+    double psi_off = 0;
+
     const std::vector<double> gates_x_e = {1}; // m
     const std::vector<double> gates_y_e = {0}; // m
     const std::vector<double> gates_z_e = {-0.5}; // m
@@ -80,13 +83,15 @@ private:
     const std::vector<double> gates_orient_y = {0};
     const std::vector<double> gates_orient_z = {0};
 
-    const double POS_ERROR_LIMIT_MAX = 2; // m
+    const double POS_ERROR_MAX_LIMIT = 2; // m
+    const double PSI_ERROR_MAX_LIMIT = M_PI/4; // rad
 
     std::deque<long int> queue_t_ms;
     std::deque<double> queue_x_meas;
     std::deque<double> queue_x_raw;
     std::deque<double> queue_y_meas;
     std::deque<double> queue_y_raw;
+    std::deque<double> queue_psi_error;
 
     static constexpr long int SLIDING_WINDOW_MS = 5000;
     static constexpr int MIN_SAMPLES_IN_WINDOW = 10; // Minimum number of samples in the window to perform regression
@@ -95,11 +100,11 @@ private:
     
     static void DCM_Cbe(const double phi, const double theta, const double psi, Eigen::Matrix<double,3,3> &DCM);
 
-    void calc_correction(double &_x_off, double &_vx_off, double &_y_off, double &_vy_off, long int &_t_ms_off, bool &valid);
+    void calc_offsets(double &_x_off, double &_vx_off, double &_y_off, double &_vy_off, double &_psi_off, double &_psi_dot_off, long int &_t_ms_off, bool &valid);
 
-    static void calc_vec_z_rotation(const Eigen::Vector3d &a, /* True gate orientation vector in Earth frame */
-                                        const Eigen::Vector3d &b, /* Observed gate orientation vector in Earth frame */
-                                        double &theta /* True gate yaw - observed gate yaw */);
+    static void calc_vec_z_rotation(const Eigen::Vector3d &a, /* Observed gate orientation vector in Earth frame */
+                                        const Eigen::Vector3d &b, /* True gate orientation vector in Earth frame */
+                                        double &psi /* True gate yaw - observed gate yaw */);
 
     // a mutex to control writes
 

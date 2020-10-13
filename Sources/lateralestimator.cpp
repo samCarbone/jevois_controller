@@ -247,68 +247,119 @@ void LateralEstimator::add_gate_obs(const Eigen::Vector3d &r_cam2gate_c, const E
     }
 
     // Convert attitude to Euler angles
-    double psi = yaw_d.at(i_match)/180.0 * M_PI;
+    double psi_raw = yaw_d.at(i_match)/180.0 * M_PI;
     double theta = pitch_d.at(i_match)/1800.0 * M_PI;
     double phi = roll_d.at(i_match)/1800.0 * M_PI;
 
+    // Apply psi correction
+    double psi_corr = psi_raw + psi_off;
+
     Eigen::Matrix3d Ceb; // Body to Earth frame
-    DCM_Cbe(phi, theta, psi, Ceb);
+    DCM_Cbe(phi, theta, psi_corr, Ceb);
     
-    // Estimate gate location and orientation in the Earth frame
-    Eigen::Vector3d r_origin2body_e;
     // Estimate drone position at the matched time
     double x_est_match = x_raw.at(i_match) + x_off + vx_off*(t_ms_raw.at(i_match)-t_ms_off)/1000.0;
     double y_est_match = y_raw.at(i_match) + y_off + vy_off*(t_ms_raw.at(i_match)-t_ms_off)/1000.0;
 
-    r_origin2body_e << x_est_match, y_est_match, z_raw.at(i_match);
+    // Estimate gate location and orientation in the Earth frame
+    Eigen::Vector3d r_origin2body_e_est;
+    r_origin2body_e_est << x_est_match, y_est_match, z_raw.at(i_match);
     Eigen::Vector3d r_body2gate_e;
-    r_body2gate_e = Ceb*Cbc*r_cam2gate_c;
-    Eigen::Vector3d r_origin2gate_e;
-    r_origin2gate_e = r_origin2body_e + r_body2gate_e;
-    Eigen::Vector3d orient_gate_e;
-    orient_gate_e = Ceb*Cbc*orient_gate_c;
+    r_body2gate_e = Ceb*Cbc*r_cam2gate_c; // Observed vector to gate from the current IMU state
+    // Eigen::Vector3d r_origin2gate_e;
+    // r_origin2gate_e = r_origin2body_e + r_body2gate_e;
+    Eigen::Vector3d orient_gate_e_obs; // Observed gate orientation from the current IMU state
+    orient_gate_e_obs = Ceb*Cbc*orient_gate_c;
 
     // Figure out which gate this is
     double min_pos_error = 0;
-    double assoc_orient_error = 0; // orient error norm associated with the gate for min pos error
+    double assoc_psi_error = 0; // Yaw error associated with the minimum position error
     int i_gate_match = 0;
+    bool gate_assigned = false;
     for(unsigned int i=0; i<gates_x_e.size(); i++) {
 
-        // Get position and orientation errors of the observed vs known gate
-        // locations and orientations
+        // Given the orientation of the gate, calculate the yaw rotation necessary from this observation
+        Eigen::Vector3d orient_gate_e_true(gates_orient_x.at(i), gates_orient_y.at(i), gates_orient_z.at(i));
+
+        // yaw error = true gate yaw - observed gate yaw
+        double psi_error = 0; // rads
+        calc_vec_z_rotation(orient_gate_e_obs, orient_gate_e_true, psi_error);
+        Eigen::Matrix3d dcm_z;
+        DCM_Cbe(0, 0, -psi_error, dcm_z);
+
+        // Calculate the platform's position working back from the gate position
+        Eigen::Vector3d r_gate_e_true(gates_x_e.at(i), gates_y_e.at(i), gates_z_e.at(i));
+        Eigen::Vector3d r_origin2body_e_back;
+        r_origin2body_e_back = r_gate_e_true - dcm_z *r_body2gate_e;
+
+        // Calculate error between the platform's expected position and the back-calculated position
         Eigen::Vector3d r_error;
-        r_error << gates_x_e.at(i) - r_origin2gate_e(0),
-                gates_y_e.at(i) - r_origin2gate_e(1),
-                gates_z_e.at(i) - r_origin2gate_e(2);
-        Eigen::Vector3d orient_error;
-        orient_error << gates_orient_x.at(i) - orient_gate_e(0),
-                        gates_orient_y.at(i) - orient_gate_e(1),
-                        gates_orient_z.at(i) - orient_gate_e(2);
-        
+        r_error = r_origin2body_e_back - r_origin2body_e_est;
         double r_error_norm = r_error.norm();
-        double orient_error_norm = orient_error.norm();
-        if(i==0 || r_error_norm < min_pos_error) {
-            min_pos_error = orient_error_norm;
-            assoc_orient_error = orient_error_norm;
+
+        if((i==0 || r_error_norm < min_pos_error) && r_error_norm < POS_ERROR_MAX_LIMIT && std::abs(psi_error) < PSI_ERROR_MAX_LIMIT) {
+            min_pos_error = r_error_norm;
+            assoc_psi_error = psi_error;
             i_gate_match = i;
+            gate_assigned = true;
         }
+
     }
 
-    // If the position error is greater than the maximum allowable, disregard this observation
-    if(min_pos_error > POS_ERROR_LIMIT_MAX) {
-        std::cerr << time_cap_ms << " [error] Lateral estimator: POS_ERROR_LIMIT_MAX exceeded. Min error: " 
-                << min_pos_error << "m" << std::endl;
+    // If no gate was assigned, then record this error
+    if(!gate_assigned) {
+        std::cerr << time_cap_ms << " [error] Lateral estimator: No gate assigned" << std::endl;
         return;
     }
 
+    // Re-calculate the platform's position working back from the position of the matched gate
+    Eigen::Vector3d r_origin2gatematch_e(gates_x_e.at(i_gate_match), gates_y_e.at(i_gate_match), gates_z_e.at(i_gate_match));
+    Eigen::Vector3d r_origin2body_e;
+    Eigen::Matrix3d dcm_z;
+    DCM_Cbe(0, 0, -assoc_psi_error, dcm_z);
+    r_origin2body_e = r_origin2gatematch_e - dcm_z *r_body2gate_e;
+
+    // // Figure out which gate this is
+    // double min_pos_error = 0;
+    // double assoc_orient_error = 0; // orient error norm associated with the gate for min pos error
+    // int i_gate_match = 0;
+    // for(unsigned int i=0; i<gates_x_e.size(); i++) {
+
+    //     // Get position and orientation errors of the observed vs known gate
+    //     // locations and orientations
+    //     Eigen::Vector3d r_error;
+    //     r_error << gates_x_e.at(i) - r_origin2gate_e(0),
+    //             gates_y_e.at(i) - r_origin2gate_e(1),
+    //             gates_z_e.at(i) - r_origin2gate_e(2);
+    //     Eigen::Vector3d orient_error;
+    //     orient_error << gates_orient_x.at(i) - orient_gate_e(0),
+    //                     gates_orient_y.at(i) - orient_gate_e(1),
+    //                     gates_orient_z.at(i) - orient_gate_e(2);
+        
+    //     double r_error_norm = r_error.norm();
+    //     double orient_error_norm = orient_error.norm();
+    //     if(i==0 || r_error_norm < min_pos_error) {
+    //         min_pos_error = r_error_norm;
+    //         assoc_orient_error = orient_error_norm;
+    //         i_gate_match = i;
+    //     }
+    // }
+
+    // If the position error is greater than the maximum allowable, disregard this observation
+    // if(min_pos_error > POS_ERROR_LIMIT_MAX) {
+    //     std::cerr << time_cap_ms << " [error] Lateral estimator: POS_ERROR_LIMIT_MAX exceeded. Min error: " 
+    //             << min_pos_error << "m" << std::endl;
+    //     return;
+    // }
+
     // Back-calculate the body position based upon the gate observation and known position
-    Eigen::Vector3d r_origin2gatematchtruth_e;
-    r_origin2gatematchtruth_e << gates_x_e.at(i_gate_match), gates_y_e.at(i_gate_match), gates_z_e.at(i_gate_match);
+    // Eigen::Vector3d r_origin2gatematchtruth_e;
+    // r_origin2gatematchtruth_e << gates_x_e.at(i_gate_match), gates_y_e.at(i_gate_match), gates_z_e.at(i_gate_match);
 
     // Observed body position in the Earth frame
     // Using gate truth position and IMU orientation
-    Eigen::Vector3d r_origin2bodyIMU_e; 
-    r_origin2bodyIMU_e = r_origin2gatematchtruth_e - r_body2gate_e;
+    // Eigen::Vector3d r_origin2bodyIMU_e; 
+    // r_origin2bodyIMU_e = r_origin2gatematchtruth_e - r_body2gate_e;
 
     // Remove elements in the queue outside of the window
     for(unsigned int i=0; i<queue_t_ms.size(); i++) {
@@ -318,6 +369,7 @@ void LateralEstimator::add_gate_obs(const Eigen::Vector3d &r_cam2gate_c, const E
             queue_x_raw.erase(queue_x_raw.begin());
             queue_y_meas.erase(queue_y_meas.begin());
             queue_y_raw.erase(queue_y_raw.begin());
+            queue_psi_error.erase(queue_psi_error.begin());
         }
         else {
             break;
@@ -326,16 +378,20 @@ void LateralEstimator::add_gate_obs(const Eigen::Vector3d &r_cam2gate_c, const E
 
     // Add to the queue
     queue_t_ms.push_back(time_cap_ms); // Using the capture time rather than IMU time
-    queue_x_meas.push_back(r_origin2bodyIMU_e(0));
-    queue_y_meas.push_back(r_origin2bodyIMU_e(1));
+    queue_x_meas.push_back(r_origin2body_e(0));
+    queue_y_meas.push_back(r_origin2body_e(1));
     queue_x_raw.push_back(x_raw.at(i_match));
     queue_y_raw.push_back(y_raw.at(i_match));
+
+    // as the assoc_yaw_error will include the previous yaw correction, add the previous correction as well
+    queue_psi_error.push_back(assoc_psi_error + psi_off);
 
     // Copy previous offsets for file save later
     double x_off_prev = x_off;
     double y_off_prev = y_off;
     double vx_off_prev = vx_off;
     double vy_off_prev = vy_off;
+    double psi_off_prev = psi_off;
     double t_ms_off_prev = t_ms_off;
 
     bool valid = false; 
@@ -344,13 +400,16 @@ void LateralEstimator::add_gate_obs(const Eigen::Vector3d &r_cam2gate_c, const E
 
         // Process the queue
         double x_off_temp = 0; double vx_off_temp = 0; double y_off_temp = 0; double vy_off_temp = 0;
+        double psi_off_temp = 0; double psi_dot_off_temp = 0;
         long int t_ms_off_temp = 0;
-        calc_correction(x_off_temp, vx_off_temp, y_off_temp, vy_off_temp, t_ms_off_temp, valid);
+        calc_offsets(x_off_temp, vx_off_temp, y_off_temp, vy_off_temp, psi_off_temp, psi_dot_off_temp, t_ms_off_temp, valid);
         if(valid) {
             x_off = x_off_temp;
             vx_off = vx_off_temp;
             y_off = y_off_temp;
             vy_off = vy_off_temp;
+            psi_off = psi_off_temp;
+            // Note: ignoring yaw rate offset
             t_ms_off = t_ms_off_temp;
         }
 
@@ -401,9 +460,9 @@ void LateralEstimator::add_gate_obs(const Eigen::Vector3d &r_cam2gate_c, const E
 
 }
 
-void LateralEstimator::calc_vec_z_rotation(const Eigen::Vector3d &a, /* True gate orientation vector in Earth frame */
-                                        const Eigen::Vector3d &b, /* Observed gate orientation vector in Earth frame */
-                                        double &psi /* True gate yaw - observed gate yaw */) 
+void LateralEstimator::calc_vec_z_rotation(const Eigen::Vector3d &a, /* Observed gate orientation vector in Earth frame */
+                                        const Eigen::Vector3d &b, /* True gate orientation vector in Earth frame */
+                                        double &psi /* True gate yaw - observed gate yaw, rad */) 
 {
     
     // Angle to rotate a towards b about the z-axis
@@ -426,7 +485,7 @@ void LateralEstimator::calc_vec_z_rotation(const Eigen::Vector3d &a, /* True gat
 }
 
 
-void LateralEstimator::calc_correction(double &_x_off, double &_vx_off, double &_y_off, double &_vy_off, long int &_t_ms_off, bool &valid)
+void LateralEstimator::calc_offsets(double &_x_off, double &_vx_off, double &_y_off, double &_vy_off, double &_psi_off, double &_psi_dot_off, long int &_t_ms_off, bool &valid)
 {
 
     // SAFE TO RUN IN PARALLEL (BUT NOT IN PARALLEL TO ADD_GATE)
@@ -450,32 +509,39 @@ void LateralEstimator::calc_correction(double &_x_off, double &_vx_off, double &
     Eigen::VectorXd Dt(queue_t_ms.size());
     Eigen::VectorXd Dx(queue_t_ms.size());
     Eigen::VectorXd Dy(queue_t_ms.size());
+    Eigen::VectorXd Dpsi(queue_t_ms.size());
 
     for(unsigned int i=0; i<queue_t_ms.size(); i++) {
         Dt(i) = (queue_t_ms.at(i) - queue_t_ms.back())/1000.0;
         Dx(i) = queue_x_meas.at(i) - queue_x_raw.at(i);
         Dy(i) = queue_y_meas.at(i) - queue_y_raw.at(i);
+        Dpsi(i) = queue_psi_error.at(i);
     }
 
     unsigned iter = 20;
     double sigma_thresh = 1;
+    double sigma_thresh_yaw = 0.0873; // Approx 5 deg
     double sample_prop = 0.8;
     unsigned int select_n = static_cast<unsigned int>(round(queue_t_ms.size()*sample_prop));
     Eigen::Matrix2d P; P << 0, 0, 0, 0.3;
-    bool valid_x;
-    bool valid_y;
+    bool valid_x = false;
+    bool valid_y = false;
+    bool valid_yaw = false;
     try {
         prior_ransac(Dt, Dx, iter, sigma_thresh, select_n, P, _x_off, _vx_off, valid_x, 0);
         prior_ransac(Dt, Dy, iter, sigma_thresh, select_n, P, _y_off, _vy_off, valid_y, 0);
+        prior_ransac(Dt, Dpsi, iter, sigma_thresh, select_n, P, _psi_off, _psi_dot_off, valid_yaw, 0);
     } catch(const std::exception& e) {
         std::cerr << "Ransac thrown exception" << e.what() << std::endl;
         valid_x = false;
         valid_y = false;
+        valid_yaw = false;
     }
-    valid = valid_x && valid_y;
+    valid = valid_x && valid_y && valid_yaw;
     _t_ms_off = queue_t_ms.back();
 
 }
+
 
 void LateralEstimator::DCM_Cbe(const double phi, const double theta, const double psi, Eigen::Matrix<double,3,3> &DCM)
 {
@@ -553,12 +619,14 @@ void LateralEstimator::reset()
     y_off = 0;
     vy_off = 0;
     t_ms_off = 0;
+    psi_off = 0;
 
     queue_t_ms.clear();
     queue_x_meas.clear();
     queue_x_raw.clear();
     queue_y_meas.clear();
     queue_y_raw.clear();
+    queue_psi_error.clear();
 }
 
 void LateralEstimator::get_heading(int &_yaw_d, bool &valid)
