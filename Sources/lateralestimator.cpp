@@ -401,6 +401,31 @@ void LateralEstimator::add_gate_obs(const Eigen::Vector3d &r_cam2gate_c, const E
 
 }
 
+void LateralEstimator::calc_vec_z_rotation(const Eigen::Vector3d &a, /* True gate orientation vector in Earth frame */
+                                        const Eigen::Vector3d &b, /* Observed gate orientation vector in Earth frame */
+                                        double &psi /* True gate yaw - observed gate yaw */) 
+{
+    
+    // Angle to rotate a towards b about the z-axis
+
+    // Project the vectors onto the XY-plane
+    // In this case, can just take the x and y components
+    Eigen::Vector3d a_proj(a(0), a(1), 0);
+    Eigen::Vector3d b_proj(b(0), b(1), 0);
+    
+    // Calculate the yaw error between the true and observed gate orientations
+    Eigen::Vector3d crossp_n = a_proj.cross(b_proj);
+    double dotp = a_proj.dot(b_proj);
+
+    // opposite and adjacent. Note: no need to divide by vector magnitudes as it will divide out
+    // If the normal vector is in the opposite direction to the positive z-axis, need to negate the angle
+    double opp = crossp_n(2) > 0 ? crossp_n.norm() : -crossp_n.norm();
+    double adj = dotp;
+    psi = std::atan2(opp, adj); // between -pi and pi
+
+}
+
+
 void LateralEstimator::calc_correction(double &_x_off, double &_vx_off, double &_y_off, double &_vy_off, long int &_t_ms_off, bool &valid)
 {
 
