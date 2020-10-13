@@ -186,7 +186,7 @@ void LateralEstimator::add_attitude(const std::int16_t roll, const std::int16_t 
 
 }
 
-void LateralEstimator::add_gate_obs(const Eigen::Vector3d &r_cam2gate, const Eigen::Vector3d &orient_c, const long int time_cap_ms)
+void LateralEstimator::add_gate_obs(const Eigen::Vector3d &r_cam2gate_c, const Eigen::Vector3d &orient_gate_c, const long int time_cap_ms)
 {
 
     // SAFE TO RUN IN PARALLEL
@@ -208,6 +208,10 @@ void LateralEstimator::add_gate_obs(const Eigen::Vector3d &r_cam2gate, const Eig
     _off
     */
 
+   // Format:
+   // r_first2second_frame: from first to second in frame
+   // orient_thing_frame: orientation of thing in frame
+
 
     // r_to_gate: vector to from the body to the gate in the camera frame
     // orient_centre: vector out from the centre of the gate (gate orientation) in the camera frame
@@ -224,7 +228,6 @@ void LateralEstimator::add_gate_obs(const Eigen::Vector3d &r_cam2gate, const Eig
            0, 1, 0;
 
     // Search through the time deque for a match
-    // TODO: add a validity check to make sure an attitude measurement was aded
     long int min_error = std::abs(time_cap_ms-t_ms_raw.back());
     int i_match = t_ms_raw.size()-1;
     for(int i=t_ms_raw.size()-2; i>=0; i--) {
@@ -243,6 +246,7 @@ void LateralEstimator::add_gate_obs(const Eigen::Vector3d &r_cam2gate, const Eig
         return;
     }
 
+    // Convert attitude to Euler angles
     double psi = yaw_d.at(i_match)/180.0 * M_PI;
     double theta = pitch_d.at(i_match)/1800.0 * M_PI;
     double phi = roll_d.at(i_match)/1800.0 * M_PI;
@@ -251,18 +255,18 @@ void LateralEstimator::add_gate_obs(const Eigen::Vector3d &r_cam2gate, const Eig
     DCM_Cbe(phi, theta, psi, Ceb);
     
     // Estimate gate location and orientation in the Earth frame
-    Eigen::Vector3d r_origin2body;
-    // Estimate position at the matched time
+    Eigen::Vector3d r_origin2body_e;
+    // Estimate drone position at the matched time
     double x_est_match = x_raw.at(i_match) + x_off + vx_off*(t_ms_raw.at(i_match)-t_ms_off)/1000.0;
     double y_est_match = y_raw.at(i_match) + y_off + vy_off*(t_ms_raw.at(i_match)-t_ms_off)/1000.0;
 
-    r_origin2body << x_est_match, y_est_match, z_raw.at(i_match);
+    r_origin2body_e << x_est_match, y_est_match, z_raw.at(i_match);
     Eigen::Vector3d r_body2gate_e;
-    r_body2gate_e = Ceb*Cbc*r_cam2gate;
-    Eigen::Vector3d r_origin2gate;
-    r_origin2gate = r_origin2body + r_body2gate_e;
-    Eigen::Vector3d orient_earth;
-    orient_earth = Ceb*Cbc*orient_c;
+    r_body2gate_e = Ceb*Cbc*r_cam2gate_c;
+    Eigen::Vector3d r_origin2gate_e;
+    r_origin2gate_e = r_origin2body_e + r_body2gate_e;
+    Eigen::Vector3d orient_gate_e;
+    orient_gate_e = Ceb*Cbc*orient_gate_c;
 
     // Figure out which gate this is
     double min_pos_error = 0;
@@ -270,36 +274,41 @@ void LateralEstimator::add_gate_obs(const Eigen::Vector3d &r_cam2gate, const Eig
     int i_gate_match = 0;
     for(unsigned int i=0; i<gates_x_e.size(); i++) {
 
-        // Get position and orientation errors
+        // Get position and orientation errors of the observed vs known gate
+        // locations and orientations
         Eigen::Vector3d r_error;
-        r_error << gates_x_e.at(i) - r_origin2gate(0),
-                gates_y_e.at(i) - r_origin2gate(1),
-                gates_z_e.at(i) - r_origin2gate(2);
+        r_error << gates_x_e.at(i) - r_origin2gate_e(0),
+                gates_y_e.at(i) - r_origin2gate_e(1),
+                gates_z_e.at(i) - r_origin2gate_e(2);
         Eigen::Vector3d orient_error;
-        orient_error << gates_orient_x.at(i) - orient_earth(0),
-                        gates_orient_y.at(i) - orient_earth(1),
-                        gates_orient_z.at(i) - orient_earth(2);
-         
-
-        double curr_pos_error = r_error.norm();
-        double curr_orient_error = orient_error.norm();
-        if(i==0 || curr_pos_error < min_pos_error) {
-            min_pos_error = curr_pos_error;
-            assoc_orient_error = curr_orient_error;
+        orient_error << gates_orient_x.at(i) - orient_gate_e(0),
+                        gates_orient_y.at(i) - orient_gate_e(1),
+                        gates_orient_z.at(i) - orient_gate_e(2);
+        
+        double r_error_norm = r_error.norm();
+        double orient_error_norm = orient_error.norm();
+        if(i==0 || r_error_norm < min_pos_error) {
+            min_pos_error = orient_error_norm;
+            assoc_orient_error = orient_error_norm;
             i_gate_match = i;
         }
-
     }
 
-    // If the error norm is too large, then discard this observation?
-    // Actually that should be up to the ransac algorithm to determine
+    // If the position error is greater than the maximum allowable, disregard this observation
+    if(min_pos_error > POS_ERROR_LIMIT_MAX) {
+        std::cerr << time_cap_ms << " [error] Lateral estimator: POS_ERROR_LIMIT_MAX exceeded. Min error: " 
+                << min_pos_error << "m" << std::endl;
+        return;
+    }
 
     // Back-calculate the body position based upon the gate observation and known position
-    Eigen::Vector3d matched_gate_pos_truth;
-    matched_gate_pos_truth << gates_x_e.at(i_gate_match), gates_y_e.at(i_gate_match), gates_z_e.at(i_gate_match);
+    Eigen::Vector3d r_origin2gatematchtruth_e;
+    r_origin2gatematchtruth_e << gates_x_e.at(i_gate_match), gates_y_e.at(i_gate_match), gates_z_e.at(i_gate_match);
 
-    Eigen::Vector3d obs_body_pos; // Observed body position in the Earth frame
-    obs_body_pos = matched_gate_pos_truth - r_body2gate_e;
+    // Observed body position in the Earth frame
+    // Using gate truth position and IMU orientation
+    Eigen::Vector3d r_origin2bodyIMU_e; 
+    r_origin2bodyIMU_e = r_origin2gatematchtruth_e - r_body2gate_e;
 
     // Remove elements in the queue outside of the window
     for(unsigned int i=0; i<queue_t_ms.size(); i++) {
@@ -317,8 +326,8 @@ void LateralEstimator::add_gate_obs(const Eigen::Vector3d &r_cam2gate, const Eig
 
     // Add to the queue
     queue_t_ms.push_back(time_cap_ms); // Using the capture time rather than IMU time
-    queue_x_meas.push_back(obs_body_pos(0));
-    queue_y_meas.push_back(obs_body_pos(1));
+    queue_x_meas.push_back(r_origin2bodyIMU_e(0));
+    queue_y_meas.push_back(r_origin2bodyIMU_e(1));
     queue_x_raw.push_back(x_raw.at(i_match));
     queue_y_raw.push_back(y_raw.at(i_match));
 
@@ -383,7 +392,7 @@ void LateralEstimator::add_gate_obs(const Eigen::Vector3d &r_cam2gate, const Eig
     if(files_open) {
         // header - long, not listed here
         //
-        file_lateral_cam << time_cap_ms << "," << r_cam2gate(0) << "," << r_cam2gate(1) << "," << r_cam2gate(2) << "," << orient_c(0) << "," << orient_c(1) << "," << orient_c(2) << ","
+        file_lateral_cam << time_cap_ms << "," << r_cam2gate_c(0) << "," << r_cam2gate_c(1) << "," << orient_gate_c(2) << "," << orient_gate_c(0) << "," << orient_gate_c(1) << "," << orient_gate_c(2) << ","
                         << t_ms_raw.at(i_match) << "," << roll_d.at(i_match) << "," << pitch_d.at(i_match) << "," << yaw_d.at(i_match) << "," << x_raw.at(i_match) << "," << y_raw.at(i_match) << "," << z_raw.at(i_match) << ","
                         << vx_raw.at(i_match) << "," << vy_raw.at(i_match) << ","
                         << t_ms_off_prev << "," << x_off_prev << "," << y_off_prev << "," << vx_off_prev << "," << vy_off_prev << ","
