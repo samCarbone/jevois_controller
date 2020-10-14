@@ -418,31 +418,42 @@ void LateralEstimator::add_gate_obs(const Eigen::Vector3d &r_cam2gate_c, const E
 
     /* Quantities saved to file
     time_cap_ms : time (pc) at which frame was captured (ms)
-    gate_obs_x: x of gate in camera frame (m)
-    gate_obs_y: y of gate in camera frame (m)
-    gate_obs_z: z of gate in camera frame (m)
-    gate_orient_x: x component of gate orientation vector in camera frame (unit)
-    gate_orient_y: y component of gate orientation vector in camera frame (unit)
-    gate_orient_z: z component of gate orientation vector in camera frame (unit)
+    r_cam2gate_cx: x of gate in camera frame (m)
+    r_cam2gate_cy: y of gate in camera frame (m)
+    r_cam2gate_cz: z of gate in camera frame (m)
+    orient_gate_cx: x component of gate orientation vector in camera frame (unit)
+    orient_gate_cy: y component of gate orientation vector in camera frame (unit)
+    orient_gate_cz: z component of gate orientation vector in camera frame (unit)
     t_match_ms: IMU capture time (PC) which is closest to the camera capture time (ms)
-    roll_dec_m: IMU roll for matched time (*1/10deg)
-    pitch_dec_m: IMU pitch for matched time (*1/10deg)
-    yaw_m: IMU yaw for matched time (deg)
+    // roll_dec_m: IMU roll for matched time (*1/10deg)
+    // pitch_dec_m: IMU pitch for matched time (*1/10deg)
+    // yaw_m: IMU yaw for matched time (deg)
     x_raw_m: raw (uncorrected) x for the matched time (m)
     y_raw_m: raw (uncorrected) y for the matched time (m)
     z_raw_m: z for the matched time (m)
     vx_raw_m: raw (uncorrected) velocity x for the matched time (m/s)
     vy_raw_m: raw (uncorrected) velocity y for the matched time (m/s)
+    phi_raw_m: raw (uncorrected) roll (rad)
+    theta_raw_m: raw (uncorrected) pitch (rad)
+    psi_raw_m: raw (uncorrected) yaw for the matched time (rad)
     t_ms_off_p: previous - time of the offset (ms)
     x_off_p: previous x offset (m)
     y_off_p: previous y offset (m)
     vx_off_p: previous vx offset (m/s)
     vy_off_p: previous vy offset (m/s)
-    t_ms_off: time of the offset (ms)
+    psi_off_p: previous psi offset (rad)
+    i_gate_match: matched gate index
+    min_pos_error: norm of the position error to the matched gate
+    assoc_psi_error: difference between the observed psi and corrected psi
+    r_origin2body_ex: observed platform position x (m)
+    r_origin2body_ey: observed platform position y (m)
+    r_origin2body_ez: observed platform position z (m)
+    t_ms_off: time of the new offset (ms)
     x_off: x offset (m)
     y_off: y offset (m) 
     vx_off: vx offset (m/s)
     vy_off: vy offset (m/s)
+    psi_off: psi offset (rad)
     n_queue: number of matched frames in the queue
     valid: whether a correction was calculated for this frame/current queue is valid (1 true / 0 false)
     */
@@ -452,11 +463,14 @@ void LateralEstimator::add_gate_obs(const Eigen::Vector3d &r_cam2gate_c, const E
     if(files_open) {
         // header - long, not listed here
         //
-        file_lateral_cam << time_cap_ms << "," << r_cam2gate_c(0) << "," << r_cam2gate_c(1) << "," << orient_gate_c(2) << "," << orient_gate_c(0) << "," << orient_gate_c(1) << "," << orient_gate_c(2) << ","
-                        << t_ms_raw.at(i_match) << "," << roll_d.at(i_match) << "," << pitch_d.at(i_match) << "," << yaw_d.at(i_match) << "," << x_raw.at(i_match) << "," << y_raw.at(i_match) << "," << z_raw.at(i_match) << ","
-                        << vx_raw.at(i_match) << "," << vy_raw.at(i_match) << ","
-                        << t_ms_off_prev << "," << x_off_prev << "," << y_off_prev << "," << vx_off_prev << "," << vy_off_prev << ","
-                        << t_ms_off << "," << x_off << "," << y_off << "," << vx_off << "," << vy_off << "," << queue_t_ms.size() << "," << (int)valid << std::endl;
+        file_lateral_cam << time_cap_ms << "," << r_cam2gate_c(0) << "," << r_cam2gate_c(1) << "," << r_cam2gate_c(2) << "," << orient_gate_c(0) << "," << orient_gate_c(1) << "," << orient_gate_c(2) << ","
+                        << t_ms_raw.at(i_match) << "," << roll_d.at(i_match) << "," << pitch_d.at(i_match) << "," << yaw_d.at(i_match) << "," 
+                        << x_raw.at(i_match) << "," << y_raw.at(i_match) << "," << z_raw.at(i_match) << ","  << vx_raw.at(i_match) << "," << vy_raw.at(i_match) << ","
+                        << phi << "," << theta << ","<< psi_raw << ","
+                        << t_ms_off_prev << "," << x_off_prev << "," << y_off_prev << "," << vx_off_prev << "," << vy_off_prev << "," << psi_off_prev << ","
+                        << i_gate_match << "," << min_pos_error << "," << assoc_psi_error << ","
+                        << r_origin2body_e(0) << "," << r_origin2body_e(1) << "," << r_origin2body_e(2) << ","
+                        << t_ms_off << "," << x_off << "," << y_off << "," << vx_off << "," << vy_off << "," << psi_off << "," << queue_t_ms.size() << "," << (int)valid << std::endl;
     }
 
 }
