@@ -85,6 +85,8 @@ private:
 
     const double POS_ERROR_MAX_LIMIT = 2; // m
     const double PSI_ERROR_MAX_LIMIT = M_PI/4; // rad
+    bool no_obs = true; // if true, ignore position error limit. This is in case there is a large xy before takeoff
+                        // Once a correction has been calculated, this becomes false
 
     std::deque<long int> queue_t_ms;
     std::deque<double> queue_x_meas;
