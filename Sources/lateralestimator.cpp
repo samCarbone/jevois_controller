@@ -178,9 +178,11 @@ void LateralEstimator::add_attitude(const std::int16_t roll, const std::int16_t 
     // File writes
     if(files_open) {
         // header
-        // time_ms,roll_dec,pitch_dec,yaw,z,x_raw,y_raw,vx_raw,vy_raw,x_off_c,y_off_c,vx_off_c,vy_off_c
-        file_lateral_raw_imu << time_ms << "," << roll << "," << pitch << "," << yaw << "," << z << "," 
-                            << x_raw.back() << "," << y_raw.back() << "," << vx_raw.back() << "," << vy_raw.back() << ","
+        // time_ms,roll_dec,pitch_dec,yaw,psi_off,psi_corr,z,x_raw,y_raw,vx_raw,vy_raw,x_off_c,y_off_c,vx_off_c,vy_off_c
+        // NOTE: psi_off and psi_corr in radians!!!
+        file_lateral_raw_imu << time_ms << "," << roll << "," << pitch << "," << yaw << ","
+                            << psi_off << "," << psi_corr << ","
+                            << z << "," << x_raw.back() << "," << y_raw.back() << "," << vx_raw.back() << "," << vy_raw.back() << ","
                             << x_off << "," << y_off << "," << vx_off << "," << vy_off
                             << std::endl;
     }
