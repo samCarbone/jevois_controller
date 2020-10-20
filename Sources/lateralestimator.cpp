@@ -257,9 +257,11 @@ void LateralEstimator::add_gate_obs(const Eigen::Vector3d &r_cam2gate_c, const E
     // Apply psi correction
     double psi_corr = psi_raw + psi_off;
 
+    Eigen::Matrix3d Cbe; // Earth to Body frame
+    DCM_Cbe(phi, theta, psi_corr, Cbe);
     Eigen::Matrix3d Ceb; // Body to Earth frame
-    DCM_Cbe(phi, theta, psi_corr, Ceb);
-    
+    Ceb = Cbe.transpose(); 
+
     // Estimate drone position at the matched time
     double x_est_match = x_raw.at(i_match) + x_off + vx_off*(t_ms_raw.at(i_match)-t_ms_off)/1000.0;
     double y_est_match = y_raw.at(i_match) + y_off + vy_off*(t_ms_raw.at(i_match)-t_ms_off)/1000.0;
@@ -300,7 +302,7 @@ void LateralEstimator::add_gate_obs(const Eigen::Vector3d &r_cam2gate_c, const E
         r_error = r_origin2body_e_back - r_origin2body_e_est;
         double r_error_norm = r_error.norm();
 
-        if((i==0 || r_error_norm < min_pos_error) && (r_error_norm < POS_ERROR_MAX_LIMIT || no_obs) && std::abs(psi_error) < PSI_ERROR_MAX_LIMIT) {
+        if((i==0 || r_error_norm < min_pos_error) && (r_error_norm < POS_ERROR_MAX_LIMIT || no_obs) /*&& std::abs(psi_error) < PSI_ERROR_MAX_LIMIT*/) {
             min_pos_error = r_error_norm;
             assoc_psi_error = psi_error;
             i_gate_match = i;
@@ -411,10 +413,14 @@ void LateralEstimator::add_gate_obs(const Eigen::Vector3d &r_cam2gate_c, const E
             vx_off = vx_off_temp;
             y_off = y_off_temp;
             vy_off = vy_off_temp;
-            psi_off = psi_off_temp;
-            // Note: ignoring yaw rate offset
             t_ms_off = t_ms_off_temp;
-            no_obs = false;
+            // no_obs = false;
+            // Note: ignoring yaw rate offset
+
+            // Reduce the rate of innovation (like a moving averge but with a fixed number of points)
+            psi_off_inst = psi_off_temp;
+            psi_off += (psi_off_temp - psi_off)/100.0;
+
         }
 
     }
@@ -428,23 +434,23 @@ void LateralEstimator::add_gate_obs(const Eigen::Vector3d &r_cam2gate_c, const E
     orient_gate_cy: y component of gate orientation vector in camera frame (unit)
     orient_gate_cz: z component of gate orientation vector in camera frame (unit)
     t_match_ms: IMU capture time (PC) which is closest to the camera capture time (ms)
-    // roll_dec_m: IMU roll for matched time (*1/10deg)
-    // pitch_dec_m: IMU pitch for matched time (*1/10deg)
+    roll_dec_m: IMU roll for matched time (*1/10deg)
+    pitch_dec_m: IMU pitch for matched time (*1/10deg)
     // yaw_m: IMU yaw for matched time (deg)
     x_raw_m: raw (uncorrected) x for the matched time (m)
     y_raw_m: raw (uncorrected) y for the matched time (m)
     z_raw_m: z for the matched time (m)
     vx_raw_m: raw (uncorrected) velocity x for the matched time (m/s)
     vy_raw_m: raw (uncorrected) velocity y for the matched time (m/s)
-    phi_raw_m: raw (uncorrected) roll (rad)
-    theta_raw_m: raw (uncorrected) pitch (rad)
+    // phi_raw_m: raw (uncorrected) roll (rad)
+    // theta_raw_m: raw (uncorrected) pitch (rad)
     psi_raw_m: raw (uncorrected) yaw for the matched time (rad)
-    t_ms_off_p: previous - time of the offset (ms)
-    x_off_p: previous x offset (m)
-    y_off_p: previous y offset (m)
-    vx_off_p: previous vx offset (m/s)
-    vy_off_p: previous vy offset (m/s)
-    psi_off_p: previous psi offset (rad)
+    // t_ms_off_p: previous - time of the offset (ms)
+    // x_off_p: previous x offset (m)
+    // y_off_p: previous y offset (m)
+    // vx_off_p: previous vx offset (m/s)
+    // vy_off_p: previous vy offset (m/s)
+    // psi_off_p: previous psi offset (rad)
     i_gate_match: matched gate index
     min_pos_error: norm of the position error to the matched gate
     assoc_psi_error: difference between the observed psi and corrected psi
@@ -456,7 +462,8 @@ void LateralEstimator::add_gate_obs(const Eigen::Vector3d &r_cam2gate_c, const E
     y_off: y offset (m) 
     vx_off: vx offset (m/s)
     vy_off: vy offset (m/s)
-    psi_off: psi offset (rad)
+    psi_off: psi offset (rad) which has a reduced innovation rate
+    psi_off_inst: instantaneous psi offset (rad)
     n_queue: number of matched frames in the queue
     valid: whether a correction was calculated for this frame/current queue is valid (1 true / 0 false)
     */
@@ -467,13 +474,15 @@ void LateralEstimator::add_gate_obs(const Eigen::Vector3d &r_cam2gate_c, const E
         // header - long, not listed here
         //
         file_lateral_cam << time_cap_ms << "," << r_cam2gate_c(0) << "," << r_cam2gate_c(1) << "," << r_cam2gate_c(2) << "," << orient_gate_c(0) << "," << orient_gate_c(1) << "," << orient_gate_c(2) << ","
-                        << t_ms_raw.at(i_match) << "," // << roll_d.at(i_match) << "," << pitch_d.at(i_match) << "," << yaw_d.at(i_match) << "," 
+                        << t_ms_raw.at(i_match) << ","  << roll_d.at(i_match) << "," << pitch_d.at(i_match) << "," // << yaw_d.at(i_match) << "," 
                         << x_raw.at(i_match) << "," << y_raw.at(i_match) << "," << z_raw.at(i_match) << ","  << vx_raw.at(i_match) << "," << vy_raw.at(i_match) << ","
-                        << phi << "," << theta << ","<< psi_raw << ","
-                        << t_ms_off_prev << "," << x_off_prev << "," << y_off_prev << "," << vx_off_prev << "," << vy_off_prev << "," << psi_off_prev << ","
+                        // << phi << "," << theta << ","
+                        << psi_raw << ","
+                        // << t_ms_off_prev << "," << x_off_prev << "," << y_off_prev << "," << vx_off_prev << "," << vy_off_prev << "," << psi_off_prev << ","
                         << i_gate_match << "," << min_pos_error << "," << assoc_psi_error << ","
                         << r_origin2body_e(0) << "," << r_origin2body_e(1) << "," << r_origin2body_e(2) << ","
-                        << t_ms_off << "," << x_off << "," << y_off << "," << vx_off << "," << vy_off << "," << psi_off << "," << queue_t_ms.size() << "," << (int)valid << std::endl;
+                        << t_ms_off << "," << x_off << "," << y_off << "," << vx_off << "," << vy_off << "," 
+                        << psi_off << "," << psi_off_inst << "," << queue_t_ms.size() << "," << (int)valid << std::endl;
     }
 
 }
@@ -538,7 +547,7 @@ void LateralEstimator::calc_offsets(double &_x_off, double &_vx_off, double &_y_
 
     unsigned iter = 20;
     double sigma_thresh = 1;
-    double sigma_thresh_yaw = 0.0873; // Approx 5 deg
+    double sigma_thresh_psi = 0.0873; // Approx 5 deg
     double sample_prop = 0.8;
     unsigned int select_n = static_cast<unsigned int>(round(queue_t_ms.size()*sample_prop));
     Eigen::Matrix2d P; P << 0, 0, 0, 0.3;
@@ -548,7 +557,7 @@ void LateralEstimator::calc_offsets(double &_x_off, double &_vx_off, double &_y_
     try {
         prior_ransac(Dt, Dx, iter, sigma_thresh, select_n, P, _x_off, _vx_off, valid_x, 0);
         prior_ransac(Dt, Dy, iter, sigma_thresh, select_n, P, _y_off, _vy_off, valid_y, 0);
-        prior_ransac(Dt, Dpsi, iter, sigma_thresh, select_n, P, _psi_off, _psi_dot_off, valid_yaw, 0);
+        prior_ransac(Dt, Dpsi, iter, sigma_thresh_psi, select_n, P, _psi_off, _psi_dot_off, valid_yaw, 0);
     } catch(const std::exception& e) {
         std::cerr << "Ransac thrown exception" << e.what() << std::endl;
         valid_x = false;
@@ -621,6 +630,7 @@ void LateralEstimator::reset()
 {
     // Reset everything back to the condition immediately after construction
     has_measurement = false;
+    no_obs = true;
 
     x_raw.clear(); x_raw.assign(500,0);
     vx_raw.clear(); vx_raw.assign(500,0);
@@ -638,6 +648,7 @@ void LateralEstimator::reset()
     vy_off = 0;
     t_ms_off = 0;
     psi_off = 0;
+    psi_off_inst = 0;
 
     queue_t_ms.clear();
     queue_x_meas.clear();

@@ -74,6 +74,7 @@ private:
 
     // yaw_true = yaw_raw + yaw_off
     double psi_off = 0;
+    double psi_off_inst = 0; // Instantaneous psi offset
 
     const std::vector<double> gates_x_e = {1}; // m
     const std::vector<double> gates_y_e = {0}; // m
@@ -122,7 +123,7 @@ private:
     bool files_open = false;
     const std::string header_lateral_raw_imu = "time_ms,roll_dec,pitch_dec,yaw,psi_off,psi_corr,z,x_raw,y_raw,vx_raw,vy_raw,x_off_c,y_off_c,vx_off_c,vy_off_c";
     //
-    const std::string header_lateral_cam = "time_cap_ms,r_cam2gate_cx,r_cam2gate_cy,r_cam2gate_cz,orient_gate_cx,orient_gate_cy,orient_gate_cz,t_match_ms,x_raw_m,y_raw_m,z_raw_m,vx_raw_m,vy_raw_m,phi_raw_m,theta_raw_m,psi_raw_m,t_ms_off_p,x_off_p,y_off_p,vx_off_p,vy_off_p,psi_off_p,i_gate_match,min_pos_error,assoc_psi_error,r_origin2body_ex,r_origin2body_ey,r_origin2body_ez,t_ms_off,x_off,y_off,vx_off,vy_off,psi_off,n_queue,valid";
+    const std::string header_lateral_cam = "time_cap_ms,r_cam2gate_cx,r_cam2gate_cy,r_cam2gate_cz,orient_gate_cx,orient_gate_cy,orient_gate_cz,t_match_ms,roll_dec_m,pitch_dec_m,x_raw_m,y_raw_m,z_raw_m,vx_raw_m,vy_raw_m,psi_raw_m,i_gate_match,min_pos_error,assoc_psi_error,r_origin2body_ex,r_origin2body_ey,r_origin2body_ez,t_ms_off,x_off,y_off,vx_off,vy_off,psi_off,psi_off_inst,n_queue,valid";
     //
     const std::string prefix_lateral_raw_imu = "lateral_raw_imu_";
     const std::string prefix_lateral_cam = "lateral_cam_";
