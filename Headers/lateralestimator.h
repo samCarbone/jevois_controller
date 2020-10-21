@@ -76,13 +76,23 @@ private:
     double psi_off = 0;
     double psi_off_inst = 0; // Instantaneous psi offset
 
-    const std::vector<double> gates_x_e = {1}; // m
-    const std::vector<double> gates_y_e = {0}; // m
-    const std::vector<double> gates_z_e = {-0.5}; // m
+    /*one-gate*/
+    // const std::vector<double> gates_x_e = {1}; // m
+    // const std::vector<double> gates_y_e = {0}; // m
+    // const std::vector<double> gates_z_e = {-0.5}; // m
 
-    const std::vector<double> gates_orient_x = {1};
-    const std::vector<double> gates_orient_y = {0};
-    const std::vector<double> gates_orient_z = {0};
+    // const std::vector<double> gates_orient_x = {1};
+    // const std::vector<double> gates_orient_y = {0};
+    // const std::vector<double> gates_orient_z = {0};
+
+    /*two-gates*/
+    const std::vector<double> gates_x_e = {2,2}; // m
+    const std::vector<double> gates_y_e = {0,-2}; // m
+    const std::vector<double> gates_z_e = {-0.5,-0.5}; // m
+
+    const std::vector<double> gates_orient_x = {1,-1};
+    const std::vector<double> gates_orient_y = {0,0};
+    const std::vector<double> gates_orient_z = {0,0};
 
     const double POS_ERROR_MAX_LIMIT = 2; // m
     const double PSI_ERROR_MAX_LIMIT = M_PI/4; // rad
