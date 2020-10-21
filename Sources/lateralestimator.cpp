@@ -137,7 +137,7 @@ void LateralEstimator::add_attitude(const std::int16_t roll, const std::int16_t 
     Eigen::Matrix2d A;
     Eigen::Vector2d B;
     A << 0, 1,
-        0, -0.5;
+        0, -0.3;
     B << 0, 1;
 
     Eigen::Vector2d x_prev; x_prev << x_raw.back(), vx_raw.back();
