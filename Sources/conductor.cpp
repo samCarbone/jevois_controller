@@ -34,6 +34,7 @@ Conductor::Conductor(std::string serial_port_name, unsigned int baud_rate)
     // Altitude controller
     alt_controller = new AltitudeController();
     alt_estimator = new AltitudeEstimator();
+    lateral_estimator = new LateralEstimator();
 
     // Open files - allow for immediate recording
     #ifndef IS_HOST
@@ -66,6 +67,7 @@ Conductor::~Conductor()
     delete send_timer;
     delete alt_controller;
     delete alt_estimator;
+    delete lateral_estimator;
 }
 
 // **********************************************************
@@ -203,162 +205,10 @@ void Conductor::send_payload(const std::string &data_str) {
     send_payload(data);
 }
 
-// [start, end] --> [", "]
-// bool Conductor::find_first_msp(const std::vector<char> &inVec, int &start, int &end)
-// {
-
-//     const std::array<char, 2> chrs_option_1 = {'{',','};
-//     const std::array<char, 7> chrs_2 = {'\"', 'm', 's','p','\"',':','\"'};
-//     bool found_start = false;
-//     const char chr_3 = '\"';
-//     const std::array<char, 2> chrs_option_4 = {',','}'};
-//     start = 0;
-//     end = 0;
-//     int expected_end = 0;
-//     const int min_msp_len = 6;
-
-//     // Find the start
-//     for(int i=0; i<(int)inVec.size()-(int)chrs_2.size()-2-min_msp_len; i++) {
-
-//         // Check for the first character
-//         // one OR the other
-//         for(auto &opt : chrs_option_1) {
-//             if(inVec.at(i) == opt) {
-//                 found_start = true;
-//                 break;
-//             }
-//         }
-//         if(!found_start)
-//             continue;
-
-//         // Check for the next sequence of characters
-//         for(int j=0; j<chrs_2.size(); j++) {
-
-//             if(inVec.at(i+1+j) != chrs_2.at(j)) {
-//                 found_start = false;
-//                 break;
-//             }
-
-//         }
-
-//         if(found_start) {
-//             start = i+chrs_2.size();
-//             // the msp message length is read and used to find the end
-//             unsigned char message_len = static_cast<unsigned char>(inVec.at(start+4));
-//             expected_end = start + min_msp_len + static_cast<int>(message_len) + 1;
-//             break;
-//         }
-
-//     }
-
-//     if(found_start && expected_end < (int)inVec.size()-1) {
-
-//         if(inVec.at(expected_end) != chr_3)
-//             return false;
-
-//         for(auto &opt: chrs_option_4) {
-//             if(inVec.at(expected_end+1) == opt) {
-//                 end = expected_end;
-//                 return true;
-//             }
-//         }
-
-//     }
-
-//     return false;
-
-// }
 
 // [{, }]
 void Conductor::parse_packet(const std::vector<char> &inVec)
 {
-    // // Copy into a new vector --> not ideal if not necessary
-    // std::vector<char> cut_vec(inVec.begin(), inVec.end());
-
-    // /* Note: this does not support multiple msp messages
-    // within a single json packet. It will use the first msp message.
-    // */
-    // // MSP search ({,)"msp":"*"(,})
-    // // try {
-    // std::vector<char> msp_vec;
-    // bool found_msp = false;
-    // int start_msp = 0;
-    // int end_msp = 0;
-    // if(find_first_msp(cut_vec, start_msp, end_msp)) {
-    //     // copy and erase between the " "
-    //     msp_vec.insert(msp_vec.begin(), cut_vec.begin()+start_msp+1, cut_vec.begin()+end_msp);
-    //     cut_vec.erase(cut_vec.begin()+start_msp+1, cut_vec.begin()+end_msp);
-
-    //     found_msp = true;
-    // }
-    // else {
-    //     // Safe any bytes outside acceptable range
-    //     for (int i=0; i<cut_vec.size(); i++) {
-    //         if(cut_vec.at(i) <= 31) {
-    //             if(cut_vec.at(i) == '\r') {cut_vec.at(i) = 'r';}
-    //             else if(cut_vec.at(i) == '\n') {cut_vec.at(i) = 'n';}
-    //             else {cut_vec.at(i) = '#';}
-    //         }
-    //     }
-    // }
-
-    // // Catch all exceptions during parsing
-    // // We want to keep the program running and just ignore invalid json packets
-    // json j_doc;
-    // try {
-    //     j_doc = json::parse(cut_vec);
-    // } catch(const std::exception& e) {
-    //     pub_log_check("JSON parse error", LL_ERROR, true);
-    //     std::cerr << "[caught] " << e.what() << std::endl;   
-    //     return; 
-    // }
-        
-    // if(j_doc.is_null())
-    //         return;
-
-    // if (j_doc["dst"] != "jv") {
-    //     pub_log_check("Incorrect json dest", LL_ERROR, true);
-    //     return;
-    // }
-
-    // pub_log_check("JSON received", LL_DEBUG, true);
-
-    // if(j_doc["snd"] == "esp") {
-
-    //     if(j_doc["typ"] == "alt") {
-    //         parse_altitude(j_doc["alt"]);
-    //         pub_log_check("Altitude received", LL_DEBUG, true);
-    //     }
-        
-    //     else if(j_doc["typ"] == "msp") {
-    //         // Need to search for the msp bytes
-    //         // parse_msp(std::vector<char> msp_vec);
-    //         pub_log_check("MSP received", LL_DEBUG, true);
-    //     }
-
-    // }
-
-    // else if (j_doc["snd"] == "pc") {
-
-    //     if(j_doc["typ"] == "mode") {
-    //         pub_log_check("Mode received", LL_DEBUG, true);
-    //         parse_mode(j_doc);
-    //     }
-
-    //     else if(j_doc["typ"] == "land") {
-    //         pub_log_check("Landing received", LL_DEBUG, true);
-    //         parse_landing(j_doc);
-    //     }
-
-    //     else if(j_doc["typ"] == "quit") {
-    //         set_controller_activity(false);
-    //         pub_log_check("Quit", LL_INFO, true); // Might not send
-    //         send_timer->cancel();
-    //         esp_port->cancel();
-    //         esp_port->close();
-    //     }
-
-    // }
 
     if(inVec.size()<4) {
         pub_log_check("Packet len<4", LL_ERROR, true);
@@ -423,8 +273,10 @@ void Conductor::parse_packet(const std::vector<char> &inVec)
         }
     }
     else if(src == SRC_FC) {
-        if(mid == MID_MSP) {
 
+        if(mid == MID_MSP) {
+            std::vector<unsigned char> att_data(inVec.begin()+4, inVec.end());
+            parse_attitude_msp(att_data);
         }
     }
 
@@ -443,70 +295,8 @@ void Conductor::serial_write_handler(const boost::system::error_code& error, std
 }
 
 
-
-// void Conductor::parse_altitude(const json &alt_obj)
-// {
-//     if(alt_obj.contains("sigrt") && alt_obj.contains("ambrt") && alt_obj.contains("sigma")
-//             && alt_obj.contains("spad") && alt_obj.contains("range") && alt_obj.contains("time")
-//             && alt_obj.contains("status") )
-//     {
-//         RangingData_t altData;
-//         altData.signal_rate = alt_obj["sigrt"].get<double>();
-//         altData.ambient_rate = alt_obj["ambrt"].get<double>();
-//         altData.sigma_mm = alt_obj["sigma"].get<double>();
-//         altData.eff_spad_count = alt_obj["spad"].get<double>()/256.0; // divide by 256 for real value
-//         altData.range_mm = alt_obj["range"].get<int>();
-//         altData.timeEsp_ms = alt_obj["time"].get<int>();
-//         altData.status = alt_obj["status"].get<int>();
-//         altData.timePc_ms = time_elapsed_ms();
-
-//         // Update state estimate
-//         alt_estimator->addRangeMeasurement(altData);
-//         AltState_t estimatedState = alt_estimator->getStateEstimate();
-
-//         // Update controller
-//         if(controller_activity) {
-//             alt_controller->addEstState(estimatedState);
-//         }
-
-//     }
-//     else 
-//     {
-//         pub_log_check("Invalid alt packet", LL_ERROR, true);
-//     }
-
-// }
-
 void Conductor::parse_altitude(const std::vector<unsigned char> &altData)
 {
-    // if(alt_obj.contains("sigrt") && alt_obj.contains("ambrt") && alt_obj.contains("sigma")
-    //         && alt_obj.contains("spad") && alt_obj.contains("range") && alt_obj.contains("time")
-    //         && alt_obj.contains("status") )
-    // {
-    //     RangingData_t altData;
-    //     altData.signal_rate = alt_obj["sigrt"].get<double>();
-    //     altData.ambient_rate = alt_obj["ambrt"].get<double>();
-    //     altData.sigma_mm = alt_obj["sigma"].get<double>();
-    //     altData.eff_spad_count = alt_obj["spad"].get<double>()/256.0; // divide by 256 for real value
-    //     altData.range_mm = alt_obj["range"].get<int>();
-    //     altData.timeEsp_ms = alt_obj["time"].get<int>();
-    //     altData.status = alt_obj["status"].get<int>();
-    //     altData.timePc_ms = time_elapsed_ms();
-
-    //     // Update state estimate
-    //     alt_estimator->addRangeMeasurement(altData);
-    //     AltState_t estimatedState = alt_estimator->getStateEstimate();
-
-    //     // Update controller
-    //     if(controller_activity) {
-    //         alt_controller->addEstState(estimatedState);
-    //     }
-
-    // }
-    // else 
-    // {
-    //     pub_log_check("Invalid alt packet", LL_ERROR, true);
-    // }
 
     if(altData.size() != 22) {
         pub_log_check("Invalid alt packet", LL_ERROR, true);
@@ -551,6 +341,64 @@ void Conductor::parse_altitude(const std::vector<unsigned char> &altData)
 
 }
 
+void Conductor::parse_attitude_msp(const std::vector<unsigned char> &attData)
+{
+    // Check the header and message length are valid
+    bool valid_header = false;
+    if(attData.size() >= 5) {
+        valid_header = attData.at(0) == '$' && attData.at(1) == 'M' 
+                    && attData.at(2) == '>' && attData.at(3) == 6 
+                    && attData.at(4) == MSP_ATTITUDE;
+    }
+
+    if(attData.size() != 12 || !valid_header) {
+        pub_log_check("Invalid attitude msp packet", LL_ERROR, true);
+        return;
+    }
+
+    unsigned char crc = attData.at(3) ^ attData.at(4);
+    std::uint16_t roll_u, pitch_u, yaw_u;
+    std::int16_t roll, pitch, yaw;
+    // Read it in as unsigned first and then convert to signed
+    // TODO: change to reading in as signed directly
+    roll_u = (std::uint16_t)attData.at(5) | (std::uint16_t)attData.at(6) << 8; // [-1800 : 1800] 1/10 deg
+    pitch_u = (std::uint16_t)attData.at(7) | (std::uint16_t)attData.at(8) << 8; // [-900 : 900] 1/10 deg
+    yaw_u = (std::uint16_t)attData.at(9) | (std::uint16_t)attData.at(10) << 8; // [-180 : 180] deg
+    roll = static_cast<std::int16_t>(roll_u);
+    pitch = -static_cast<std::int16_t>(pitch_u); // Negative to convert to RHS coordinate system
+    yaw = static_cast<std::int16_t>(yaw_u);
+
+    long int time_ms = time_elapsed_ms();
+
+    AltState_t alt_state = alt_estimator->getStateEstimate();
+    if(!alt_state.valid) {
+        pub_log_check("IMU value received before altitude", LL_WARN, true);
+    }
+    lateral_estimator->add_attitude(roll, pitch, yaw, alt_state.z, time_ms);
+
+
+    #ifdef IS_HOST
+    // Print location estimate
+    double x, vx, y, vy;
+    x=0; vx=0; y=0; vy=0;
+    bool valid, warn_time;
+    valid=false; warn_time=true;
+    lateral_estimator->get_position(time_elapsed_ms(), x, vx, y, vy, valid, warn_time);
+    std::cout << "Time_ms: " << time_elapsed_ms() << std::fixed << std::setprecision(1)
+                << ", roll: " << roll/10.0
+                << ", pitch: " << pitch/10.0
+                << ", yaw: " << yaw << std::fixed << std::setprecision(3)
+                << ", x: " << x
+                << ", y: " << y
+                << ", vx: " << vx
+                << ",  vy: " << vy
+                << ", warn_time: " << warn_time
+                << ", valid: " << valid
+                << std::endl;
+    #endif
+
+}
+
 
 // **********************************************************
 // Channels
@@ -592,39 +440,6 @@ double Conductor::saturate(double channel_value, const double MIN, const double 
 // Mode
 // **********************************************************
 
-// void Conductor::parse_mode(const json &mode_obj)
-// {
-//     if(mode_obj["mode"].get<int>() == 1) { // TODO: change to enum
-//         set_controller_activity(true);
-//         pub_log_check("Controller started", LL_INFO, true);
-//     }
-//     else if(mode_obj["mode"].get<int>() == 2) { // TODO: change to enum
-//         set_controller_activity(false);
-//         pub_log_check("Controller stopped", LL_INFO, true);
-//     }
-
-//     if(mode_obj["rsp"] == "true") {
-//         send_mode(controller_activity);
-//     }
-
-// }
-
-// void Conductor::parse_landing(const json &land_obj)
-// {
-//     if(land_obj["land"].get<int>() == 1) { // TODO: change to enum
-//         set_landing(true);
-//         pub_log_check("Landing started", LL_INFO, true);
-//     }
-//     else if(land_obj["land"].get<int>() == 2) { // TODO: change to enum
-//         set_landing(false);
-//         pub_log_check("Landing stopped", LL_INFO, true);
-//     }
-
-//     if(land_obj["rsp"] == "true") {
-//         send_landing(landing);
-//     }
-// }
-
 void Conductor::set_controller_activity(const bool is_active)
 {
 
@@ -633,6 +448,7 @@ void Conductor::set_controller_activity(const bool is_active)
         landing = false;
         controller_activity = is_active;
         alt_controller->resetState();
+        lateral_estimator->reset();
 
         if(is_active) {
             // Make a better way of setting the target
@@ -671,14 +487,6 @@ void Conductor::set_landing(bool is_landing)
 
 void Conductor::send_mode(const bool active)
 {
-    // json send_doc;
-    // send_doc["snd"] = "jv";
-    // send_doc["dst"] = "pc";
-    // send_doc["typ"] = "mode";
-    // send_doc["mode"] = active ? 1 : 2; // TODO: change to enum
-
-    // // Echo the json packet
-    // std::string s = send_doc.dump();
 
     std::vector<char> send_data = { SRC_JV, DST_PC, MID_MODE, RSP_FALSE, active ? JV_CTRL_ENA : JV_CTRL_DIS};
     send_payload(send_data);
@@ -686,14 +494,6 @@ void Conductor::send_mode(const bool active)
 
 void Conductor::send_landing(const bool active)
 {
-    // json send_doc;
-    // send_doc["snd"] = "jv";
-    // send_doc["dst"] = "pc";
-    // send_doc["typ"] = "land";
-    // send_doc["land"] = active ? 1 : 2; // TODO: change to enum
-
-    // // Echo the json packet
-    // std::string s = send_doc.dump();
 
     std::vector<char> send_data = { SRC_JV, DST_PC, MID_LAND, RSP_FALSE, active ? JV_LAND_ENA : JV_LAND_DIS};
     send_payload(send_data);
@@ -760,14 +560,14 @@ void Conductor::timer_handler(const boost::system::error_code& error)
                 pub_log_check(error_str, LL_ERROR, true);
             }
 
-            #ifdef IS_HOST
-            std::cout << "Prop-> Time esp: " << prop_alt_state.timeEsp_ms
-                        << ", Time pc: " << prop_alt_state.timePc_ms
-                        << std::fixed << std::setprecision(4) << ", z: " << prop_alt_state.z
-                        << ", \tz_dot: " << prop_alt_state.z_dot;
-            std::cout   << ",  \tchn_thr: " << chn_thr
-                        << std::endl;
-            #endif
+            // #ifdef IS_HOST
+            // std::cout << "Prop-> Time esp: " << prop_alt_state.timeEsp_ms
+            //             << ", Time pc: " << prop_alt_state.timePc_ms
+            //             << std::fixed << std::setprecision(4) << ", z: " << prop_alt_state.z
+            //             << ", \tz_dot: " << prop_alt_state.z_dot;
+            // std::cout   << ",  \tchn_thr: " << chn_thr
+            //             << std::endl;
+            // #endif
 
             if(files_open) {
                 // header
@@ -786,13 +586,6 @@ void Conductor::timer_handler(const boost::system::error_code& error)
 
 void Conductor::send_channels(const std::array<double, 16> &channels, const bool response)
 {
-
-    // auto current_time = std::chrono::steady_clock::now();
-    // std::string write_str;
-    // std::ostringstream os;
-    // os << "Time since epoch: " << (int)std::chrono::duration_cast<std::chrono::milliseconds>(current_time.time_since_epoch()).count() << " ms\r\n";
-    // write_str = os.str();
-    // prev_jv_time = current_time;
 
     std::vector<char> msp_data;
     msp_data.reserve(6+2*channels.size());
@@ -822,16 +615,6 @@ void Conductor::send_channels(const std::array<double, 16> &channels, const bool
         checksum ^= msp_data.at(i);
     } 
     msp_data.push_back(checksum);
-
-    // Hard-code json
-    // std::string pre_string = "{\"snd\":\"pc\",\"dst\":\"fc\",\"typ\":\"msp\",\"rsp\":";
-    // pre_string += response ? "\"true\"" : "\"false\"";
-    // pre_string += ",\"ctrl\":\"true\",\"msp\":\"";
-    // std::string post_string = "\"}";
-
-    // std::vector<char> all_data(pre_string.begin(), pre_string.end());
-    // all_data.insert(all_data.end(), msp_data.begin(), msp_data.end());
-    // all_data.insert(all_data.end(), post_string.begin(), post_string.end());
 
     // Insert msp data into a new vector. Not the most efficient way, but more portable
     std::vector<char> all_data = {SRC_JV, DST_FC, MID_MSP, response ? RSP_TRUE : RSP_FALSE};
@@ -910,6 +693,7 @@ bool Conductor::open_files()
     status &= file_sig.is_open();
     status &= alt_estimator->open_files();
     status &= alt_controller->open_files();
+    status &= lateral_estimator->open_files();
 
     files_open = status;
 
@@ -923,6 +707,7 @@ void Conductor::close_files()
     file_log.close();
     alt_estimator->close_files();
     alt_controller->close_files();
+    lateral_estimator->close_files();
     files_open = false;
 }
 
@@ -931,6 +716,7 @@ void Conductor::set_file_suffix(std::string suffix_in)
     suffix = suffix_in;
     alt_estimator->set_file_suffix(suffix);
     alt_controller->set_file_suffix(suffix);
+    lateral_estimator->set_file_suffix(suffix);
 }
 
 std::string Conductor::get_file_suffix()
@@ -943,6 +729,7 @@ void Conductor::set_file_directory(std::string directory_in)
     file_directory = directory_in;
     alt_estimator->set_file_directory(directory_in);
     alt_controller->set_file_directory(directory_in);
+    lateral_estimator->set_file_directory(directory_in);
 }
 
 std::string Conductor::get_file_directory()
