@@ -31,6 +31,14 @@ Conductor::Conductor(std::string serial_port_name, unsigned int baud_rate)
     send_timer = new boost::asio::high_resolution_timer(io, std::chrono::milliseconds(CONTROL_LOOP_PERIOD_MS));
     send_timer->async_wait(boost::bind(&Conductor::timer_handler, this, boost::asio::placeholders::error));
 
+    // Setup IPC
+    sem_filled = new named_semaphore(open_only, "SemFilledCam"); // Semaphore for new data ready
+    sem_empty = new named_semaphore(open_only, "SemEmptyCam"); // Semaphore for drone reading data
+    segment = new shared_memory_object(open_only, "SharedMemoryCam", read_write);
+    memregion = new mapped_region(*segment, read_write);
+    void * memaddr = memregion->get_address();
+    cam_data = static_cast<cam_ipc_data_t*>(memaddr);
+
     // Altitude controller
     alt_controller = new AltitudeController();
     alt_estimator = new AltitudeEstimator();
@@ -54,6 +62,7 @@ Conductor::Conductor(std::string serial_port_name, unsigned int baud_rate)
     io.run();
 
 }
+
 
 Conductor::~Conductor()
 {
@@ -376,6 +385,19 @@ void Conductor::parse_attitude_msp(const std::vector<unsigned char> &attData)
     }
     lateral_estimator->add_attitude(roll, pitch, yaw, alt_state.z, time_ms);
 
+    // Update camera observations
+    std::array<double,3> rotation, translation;
+    long int proc_time;
+    if(get_cam_data(rotation, translation, proc_time)) {
+
+        Eigen::Vector3d r_cam2gate, orient_c;
+        r_cam2gate(0) = translation.at(0); r_cam2gate(1) = translation.at(1); r_cam2gate(2) = translation.at(2);
+        orient_c(0) = rotation.at(0); orient_c(1) = rotation.at(1); orient_c(2) = rotation.at(2);
+        long int cap_time = time_elapsed_ms() - proc_time;
+        cap_time = cap_time > 0 ? cap_time : 0;
+        lateral_estimator->add_gate_obs(r_cam2gate, orient_c, cap_time);
+
+    }
 
     #ifdef IS_HOST
     // Print location estimate
@@ -398,6 +420,40 @@ void Conductor::parse_attitude_msp(const std::vector<unsigned char> &attData)
     #endif
 
 }
+
+
+
+// **********************************************************
+// Camera
+// **********************************************************
+
+
+bool Conductor::get_cam_data(std::array<double,3> &rotation, std::array<double,3> &translation, long int &proc_time)
+{
+    // Check if the data is available
+    if(sem_filled->try_wait()) {
+        // Read the data
+        std::copy(std::begin(cam_data->rotation), std::end(cam_data->rotation), rotation.begin());
+        std::copy(std::begin(cam_data->translation), std::end(cam_data->translation), translation.begin());
+        proc_time = cam_data->proc_time;
+        // Notify we are done with the data
+        sem_empty->post();
+
+        // Check if this is a starting prompt
+        if(proc_time == -500) { 
+            pub_log_check("Cam connected", LL_INFO, true);
+            return false;
+        }
+
+        return true;
+    }
+    
+    return false;
+}
+
+
+
+
 
 
 // **********************************************************
@@ -577,6 +633,31 @@ void Conductor::timer_handler(const boost::system::error_code& error)
             }
 
         }
+
+    }
+
+
+    // This is placed here so that the camera observations will update even if no serial message is received
+    // Update camera observations
+    std::array<double,3> rotation, translation;
+    long int proc_time;
+    if(get_cam_data(rotation, translation, proc_time)) {
+
+        Eigen::Vector3d r_cam2gate, orient_c;
+        r_cam2gate(0) = translation.at(0); r_cam2gate(1) = translation.at(1); r_cam2gate(2) = translation.at(2);
+        orient_c(0) = rotation.at(0); orient_c(1) = rotation.at(1); orient_c(2) = rotation.at(2);
+        long int cap_time = time_elapsed_ms() - proc_time;
+        cap_time = cap_time > 0 ? cap_time : 0;
+        lateral_estimator->add_gate_obs(r_cam2gate, orient_c, cap_time);
+
+        #ifdef IS_HOST
+        // Print cam data -- assuming the IMU data is not coming in
+        // Print the data
+        std::cout << "Translation: " << std::fixed << std::setprecision(2)
+        << "x: " << translation[0] << ", y: " << translation[1] << ", z: " << translation[2]
+        << ", Rotation: " << std::fixed << std::setprecision(2)
+        << "rx: " << rotation[0] << ", ry: " << rotation[1] << ", rz: " << rotation[2] << std::endl;
+        #endif
 
     }
 
