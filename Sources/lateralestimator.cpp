@@ -368,7 +368,7 @@ void LateralEstimator::add_gate_obs(const Eigen::Vector3d &r_cam2gate_c, const E
 
     // Remove elements in the queue outside of the window
     for(unsigned int i=0; i<queue_t_ms.size(); i++) {
-        if(time_cap_ms - queue_t_ms.at(i) > SLIDING_WINDOW_MS) {
+        if(time_cap_ms - queue_t_ms.at(1) > SLIDING_WINDOW_MS) {
             queue_t_ms.erase(queue_t_ms.begin());
             queue_x_meas.erase(queue_x_meas.begin());
             queue_x_raw.erase(queue_x_raw.begin());
