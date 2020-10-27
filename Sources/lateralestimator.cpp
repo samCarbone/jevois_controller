@@ -302,7 +302,7 @@ void LateralEstimator::add_gate_obs(const Eigen::Vector3d &r_cam2gate_c, const E
         r_error = r_origin2body_e_back - r_origin2body_e_est;
         double r_error_norm = r_error.norm();
 
-        if((i==0 || r_error_norm < min_pos_error) && (r_error_norm < POS_ERROR_MAX_LIMIT || no_obs) /*&& std::abs(psi_error) < PSI_ERROR_MAX_LIMIT*/) {
+        if((!gate_assigned || r_error_norm < min_pos_error) && (r_error_norm < POS_ERROR_MAX_LIMIT || no_obs) && std::abs(psi_error) < PSI_ERROR_MAX_LIMIT) {
             min_pos_error = r_error_norm;
             assoc_psi_error = psi_error;
             i_gate_match = i;
