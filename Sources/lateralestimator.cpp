@@ -242,7 +242,7 @@ void LateralEstimator::add_gate_obs(const Eigen::Vector3d &r_cam2gate_c, const E
     int i_match = t_ms_raw.size()-1;
     for(int i=t_ms_raw.size()-2; i>=0; i--) {
         long int curr_error = std::abs(time_cap_ms-t_ms_raw.at(i));
-        if(curr_error < min_error) {
+        if(curr_error <= min_error) {
             i_match = i;
             min_error = curr_error;
         }
