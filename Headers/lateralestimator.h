@@ -54,8 +54,8 @@ public:
 private:
 
     // Drag
-    double Cdx = 0.5;
-    double Cdy = 0.5;
+    double Cdx = 0.3;
+    double Cdy = 0.3;
 
     // True once there is a measurement
     bool has_measurement = false;
@@ -136,7 +136,7 @@ private:
     std::ofstream file_lateral_cam;
 
     bool files_open = false;
-    const std::string header_lateral_raw_imu = "time_ms,roll_dec,pitch_dec,yaw,psi_off,psi_corr,z,x_raw,y_raw,vx_raw,vy_raw,x_off_c,y_off_c,vx_off_c,vy_off_c";
+    const std::string header_lateral_raw_imu = "time_ms,roll_dec,pitch_dec,yaw,psi_off,psi_corr,z,x_raw,y_raw,vx_raw,vy_raw,x_off_c,y_off_c,vx_off_c,vy_off_c,x_corr,y_corr";
     //
     const std::string header_lateral_cam = "time_cap_ms,r_cam2gate_cx,r_cam2gate_cy,r_cam2gate_cz,orient_gate_cx,orient_gate_cy,orient_gate_cz,t_match_ms,roll_dec_m,pitch_dec_m,x_raw_m,y_raw_m,z_raw_m,vx_raw_m,vy_raw_m,psi_raw_m,i_gate_match,min_pos_error,assoc_psi_error,r_origin2body_ex,r_origin2body_ey,r_origin2body_ez,t_ms_off,x_off,y_off,vx_off,vy_off,psi_off,psi_off_inst,n_queue,valid";
     //
