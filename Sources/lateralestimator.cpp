@@ -134,10 +134,13 @@ void LateralEstimator::add_attitude(const std::int16_t roll, const std::int16_t 
 
     // Propagate the state (without correction)
 
-    Eigen::Matrix2d A;
+    Eigen::Matrix2d Ax;
+    Eigen::Matrix2d Ay;
     Eigen::Vector2d B;
-    A << 0, 1,
-        0, -0.3;
+    Ax << 0, 1,
+        0, -Cdx;
+    Ay << 0, 1,
+        0, -Cdy;
     B << 0, 1;
 
     Eigen::Vector2d x_prev; x_prev << x_raw.back(), vx_raw.back();
@@ -152,8 +155,8 @@ void LateralEstimator::add_attitude(const std::int16_t roll, const std::int16_t 
         has_measurement = true; // Set measurement received flag
     }
 
-    x_i = (Eigen::Matrix2d::Identity() + A*T_s)*x_prev + T_s*Ft_e(0)*B;
-    y_i = (Eigen::Matrix2d::Identity() + A*T_s)*y_prev + T_s*Ft_e(1)*B;
+    x_i = (Eigen::Matrix2d::Identity() + Ax*T_s)*x_prev + T_s*Ft_e(0)*B;
+    y_i = (Eigen::Matrix2d::Identity() + Ay*T_s)*y_prev + T_s*Ft_e(1)*B;
 
     // Update deques
     x_raw.erase(x_raw.begin());

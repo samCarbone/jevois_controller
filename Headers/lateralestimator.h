@@ -52,6 +52,11 @@ public:
     std::string get_file_directory();
                     
 private:
+
+    // Drag
+    double Cdx = 0.5;
+    double Cdy = 0.5;
+
     // True once there is a measurement
     bool has_measurement = false;
 
