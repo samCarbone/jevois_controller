@@ -327,9 +327,10 @@ void LateralEstimator::add_gate_obs(const Eigen::Vector3d &r_cam2gate_c, const E
     // Re-calculate the platform's position working back from the position of the matched gate
     Eigen::Vector3d r_origin2gatematch_e(gates_x_e.at(i_gate_match), gates_y_e.at(i_gate_match), gates_z_e.at(i_gate_match));
     Eigen::Vector3d r_origin2body_e;
-    Eigen::Matrix3d dcm_z;
-    DCM_Cbe(0, 0, -assoc_psi_error, dcm_z);
-    r_origin2body_e = r_origin2gatematch_e - dcm_z *r_body2gate_e;
+    // Eigen::Matrix3d dcm_z;
+    // DCM_Cbe(0, 0, -assoc_psi_error, dcm_z);
+    // r_origin2body_e = r_origin2gatematch_e - dcm_z *r_body2gate_e; // use gate pose yaw
+    r_origin2body_e = r_origin2gatematch_e - r_body2gate_e; // use IMU yaw
 
     // // Figure out which gate this is
     // double min_pos_error = 0;
