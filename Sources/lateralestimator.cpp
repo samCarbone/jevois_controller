@@ -120,8 +120,8 @@ void LateralEstimator::add_attitude(const std::int16_t roll, const std::int16_t 
     // yaw [-180 : 180] deg
     double psi_raw = yaw/180.0 * M_PI;
     double psi_corr = psi_raw + psi_off;
-    double theta = pitch/1800.0 * M_PI;
-    double phi = roll/1800.0 * M_PI;
+    double theta = pitch/1800.0 * M_PI + pitch_off/180.0 * M_PI;
+    double phi = roll/1800.0 * M_PI + roll_off/180.0 * M_PI;
     Eigen::Matrix<double,3,3> Ceb;
     DCM_Cbe(phi, theta, psi_corr, Ceb);
     Ceb.transposeInPlace(); // Body to Earth frame transformation

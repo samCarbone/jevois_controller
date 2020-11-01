@@ -54,8 +54,12 @@ public:
 private:
 
     // Drag
-    double Cdx = 0.3;
-    double Cdy = 0.3;
+    const double Cdx = 0.3;
+    const double Cdy = 0.3;
+
+    // Roll and pitch offsets
+    const double pitch_off = 0; // Degrees
+    const double roll_off = 0; // Degrees
 
     // True once there is a measurement
     bool has_measurement = false;
