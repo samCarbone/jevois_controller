@@ -348,6 +348,11 @@ void Conductor::parse_altitude(const std::vector<unsigned char> &altData)
         alt_controller->addEstState(estimatedState);
     }
 
+    // Check if the minimum starting altitude for lat prop has been reached
+    if(!start_alt_reached && -estimatedState.z > MIN_START_ALT) {
+        start_alt_reached = true;
+    }
+
 }
 
 void Conductor::parse_attitude_msp(const std::vector<unsigned char> &attData)
@@ -379,11 +384,13 @@ void Conductor::parse_attitude_msp(const std::vector<unsigned char> &attData)
 
     long int time_ms = time_elapsed_ms();
 
-    AltState_t alt_state = alt_estimator->getStateEstimate();
-    if(!alt_state.valid) {
-        pub_log_check("IMU value received before altitude", LL_WARN, true);
+    if(start_alt_reached) {
+        AltState_t alt_state = alt_estimator->getStateEstimate();
+        if(!alt_state.valid) {
+            pub_log_check("IMU value received before altitude", LL_WARN, true);
+        }
+        lateral_estimator->add_attitude(roll, pitch, yaw, alt_state.z, time_ms);
     }
-    lateral_estimator->add_attitude(roll, pitch, yaw, alt_state.z, time_ms);
 
     // Update camera observations
     std::array<double,3> rotation, translation;

@@ -119,11 +119,14 @@ private:
     bool found_start = false;
     size_t SRC_MAX_LEN = 512; // Maximum length of serial read concat
 
-
     // Control system
     AltitudeController* alt_controller;
     AltitudeEstimator* alt_estimator;
     LateralEstimator* lateral_estimator;
+
+    // Start propagating lateral position only once a minimum altitude has been reached
+    bool start_alt_reached = false;
+    const double MIN_START_ALT = 0.2; // 0.2m start altitude (altitude, i.e. -z)
 
     // File Methods
     bool open_files(); //
