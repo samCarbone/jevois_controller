@@ -597,8 +597,8 @@ void Conductor::timer_handler(const boost::system::error_code& error)
             if(landing) {
                 AltTarget_t targetTemp;
                 if(alt_controller->getTarget(targetTemp)) {
-                    targetTemp.z += 0.1*((double)CONTROL_LOOP_PERIOD_MS)/1000.0;
-                    targetTemp.z_dot = 0.1;
+                    targetTemp.z += 0.08*((double)CONTROL_LOOP_PERIOD_MS)/1000.0;
+                    targetTemp.z_dot = 0.05;
                     targetTemp.z = targetTemp.z > 0.0 ? targetTemp.z : 0.0;
                     alt_controller->setTarget(targetTemp);
                 }
