@@ -44,7 +44,10 @@ private:
     long int currentTimePc_ms;
     bool targetIsSet = false;
     Eigen::Matrix<double, 1, 3> B; // [P D I]
-    double thrSS = -47.8935;
+    double thrSS = -3.5;
+    double P = -7.178;
+    double I = -2.5;
+    double D = -12.5;
 
     // File save attributes
     std::ofstream file_alt_ctrl;
