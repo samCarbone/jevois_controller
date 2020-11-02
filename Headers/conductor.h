@@ -73,7 +73,7 @@ private:
     // Channels
     static constexpr double MAX_CHANNEL_VALUE = 100;
     static constexpr double MIN_CHANNEL_VALUE = -100;
-    const double MAX_THROTTLE = 0;
+    const double MAX_THROTTLE = 20;
     const unsigned char MSP_CHANNEL_ID = 200;
     const unsigned char MSP_ATTITUDE = 108;
     std::array<double, 4> controller_channels = {0, 0, 0, 0};
