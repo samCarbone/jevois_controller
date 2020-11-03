@@ -7,7 +7,7 @@
 #include <chrono>
 #include <vector>
 #include <array>
-#include <math.h>
+#include <cmath>
 #include <cstdint>
 
 #include <boost/asio.hpp>
@@ -27,6 +27,7 @@
 #include "altitudecontroller.h"
 #include "lateralestimator.h"
 #include "pidcontroller.h"
+#include "waypointselector.h"
 
 using json = nlohmann::json;
 using namespace boost::interprocess;
@@ -129,6 +130,7 @@ private:
     PIDcontroller* y_control; double P_y = 10; double I_y = 0; double D_y = 10;
     const double MIN_CHANNEl_LAT = -10;
     const double MAX_CHANNEL_LAT = 10;
+    WaypointSelector* waypoints;
 
     // Start propagating lateral position only once a minimum altitude has been reached
     bool start_alt_reached = false;
