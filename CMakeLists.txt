@@ -55,8 +55,8 @@ add_subdirectory(json)
 INCLUDE_DIRECTORIES(${PROJECT_SOURCE_DIR}/CRCpp/inc/)
 
 # add the executables
-set(SOURCES Sources/main.cpp Sources/conductor.cpp Sources/altitudeestimator.cpp Sources/altitudecontroller.cpp Sources/lateralestimator.cpp)
-set(HEADERS Headers/conductor.h Headers/altitudeestimator.h Headers/altitudecontroller.h Headers/def.h Headers/my_enums.h CRCpp/inc/CRC.h Headers/lateralestimator.h)
+set(SOURCES Sources/main.cpp Sources/conductor.cpp Sources/altitudeestimator.cpp Sources/altitudecontroller.cpp Sources/lateralestimator.cpp Sources/waypointselector.cpp Sources/pidcontroller.cpp)
+set(HEADERS Headers/conductor.h Headers/altitudeestimator.h Headers/altitudecontroller.h Headers/def.h Headers/my_enums.h CRCpp/inc/CRC.h Headers/lateralestimator.h Headers/waypointselector.h Headers/pidcontroller.h)
 add_executable(Main ${SOURCES} ${HEADERS})
 
 # link libraries
