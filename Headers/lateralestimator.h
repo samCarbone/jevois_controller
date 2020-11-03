@@ -27,7 +27,7 @@ public:
 
     void get_position(long int time_ms, double &x, double &vx, double &y, double &vy, bool &valid, bool &warn_time, const long int prop_time_limit_ms=1000);
 
-    void get_heading(int &yaw, bool &valid);
+    void get_heading(double &psi, double &psi_dot, bool &valid);
 
     void reset();
 
@@ -74,6 +74,7 @@ private:
     std::deque<int> pitch_d; // pitch [-900 : 900] 1/10 deg
     std::deque<int> yaw_d; // yaw [-180 : 180] deg
     std::deque<long int> t_ms_raw;
+    long int count_imu_meas = 0;
 
     double x_off = 0;
     double vx_off = 0;

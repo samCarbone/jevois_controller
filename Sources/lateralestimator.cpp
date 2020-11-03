@@ -181,6 +181,7 @@ void LateralEstimator::add_attitude(const std::int16_t roll, const std::int16_t 
     yaw_d.push_back(yaw);
     t_ms_raw.erase(t_ms_raw.begin());
     t_ms_raw.push_back(time_ms);
+    count_imu_meas += 1;
 
     // File writes
     if(files_open) {
@@ -592,6 +593,12 @@ void LateralEstimator::DCM_Cbe(const double phi, const double theta, const doubl
 
 void LateralEstimator::get_position(long int time_ms, double &x, double &vx, double &y, double &vy, bool &valid, bool &warn_time, const long int prop_time_limit_ms)
 {
+
+    if(!has_measurement) {
+        valid = false; // If there has not been an imu measurement
+        return;
+    }
+
     // Apply the correction to give a position estimate
     double DeltaT_off = (time_ms - t_ms_off)/1000.0; // Time difference to when the offset was calculated in SECONDS
     double DeltaT_raw = (time_ms - t_ms_raw.back())/1000.0; // Time difference to the last IMU measurement in SECONDS
@@ -628,10 +635,6 @@ void LateralEstimator::get_position(long int time_ms, double &x, double &vx, dou
         valid = false;
         warn_time = true;
     }
-
-    if(!has_measurement) {
-        valid = false; // If there has not been an imu measurement
-    }
     
 }
 
@@ -650,6 +653,7 @@ void LateralEstimator::reset()
     pitch_d.clear(); pitch_d.assign(500,0);
     yaw_d.clear(); yaw_d.assign(500,0);
     t_ms_raw.clear(); t_ms_raw.assign(500,0);
+    count_imu_meas = 0;
 
     x_off = 0;
     vx_off = 0;
@@ -667,15 +671,29 @@ void LateralEstimator::reset()
     queue_psi_error.clear();
 }
 
-void LateralEstimator::get_heading(int &_yaw_d, bool &valid)
+void LateralEstimator::get_heading(double &psi, double &psi_dot, bool &valid)
 {
-    // Note: yaw in (whole) degrees
-
-    if(!has_measurement) {
+    // Note: psi in radians
+    // Require at least four previous IMU measurements
+    if(!has_measurement || count_imu_meas < 4) {
         valid = false;
         return;
     }
-    _yaw_d = yaw_d.back(); 
+
+    psi = yaw_d.back()/180.0 * M_PI + psi_off; 
+
+    // Estimate the yaw rate from previous measurements using backwards difference
+    double psi_3 = yaw_d.at(yaw_d.size()-1)/180.0 * M_PI; double t3 = t_ms_raw.at(t_ms_raw.size()-1)/1000.0;
+    double psi_2 = yaw_d.at(yaw_d.size()-2)/180.0 * M_PI; double t2 = t_ms_raw.at(t_ms_raw.size()-2)/1000.0;
+    double psi_1 = yaw_d.at(yaw_d.size()-3)/180.0 * M_PI; double t1 = t_ms_raw.at(t_ms_raw.size()-3)/1000.0;
+    double psi_0 = yaw_d.at(yaw_d.size()-4)/180.0 * M_PI; double t0 = t_ms_raw.at(t_ms_raw.size()-4)/1000.0;
+
+    // As the time steps are different, take the average.
+    double h = (t3 - t0)/3.0;
+
+    // 3rd-order backwards difference
+    psi_dot = (-2*psi_0+9*psi_1-18*psi_2+11*psi_3)/(6*h);
+
 }
 
 
