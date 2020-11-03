@@ -39,10 +39,13 @@ Conductor::Conductor(std::string serial_port_name, unsigned int baud_rate)
     void * memaddr = memregion->get_address();
     cam_data = static_cast<cam_ipc_data_t*>(memaddr);
 
-    // Altitude controller
+    // Controller
     alt_controller = new AltitudeController();
     alt_estimator = new AltitudeEstimator();
     lateral_estimator = new LateralEstimator();
+    psi_control = new PIDcontroller(P_psi, I_psi, D_psi);
+    x_control = new PIDcontroller(P_x, I_x, D_x);
+    y_control = new PIDcontroller(P_y, I_y, D_y);
 
     // Open files - allow for immediate recording
     #ifndef IS_HOST
@@ -54,6 +57,10 @@ Conductor::Conductor(std::string serial_port_name, unsigned int baud_rate)
     set_file_directory("/home/samuel/Documents/host_logs");
     #endif
 
+    // Files
+    psi_control->set_file_prefix("psi_ctrl_");
+    x_control->set_file_prefix("x_ctrl_");
+    y_control->set_file_prefix("y_ctrl_");
     open_files();
 
     pub_log_check("Started", LL_INFO, true);
@@ -80,7 +87,7 @@ Conductor::~Conductor()
 }
 
 // **********************************************************
-//
+// Serial
 // **********************************************************
 
 
@@ -406,6 +413,29 @@ void Conductor::parse_attitude_msp(const std::vector<unsigned char> &attData)
 
     }
 
+    // Update waypoints
+
+    // Update controller targets
+
+    // Update controllers
+    long int time_ctrl_ms = time_elapsed_ms();
+    double x = 0; double y = 0;
+    double vx = 0; double vy = 0;
+    bool valid = false; bool warn_time = false;
+    lateral_estimator->get_position(time_ctrl_ms, x, vx, y, vy, valid, warn_time);
+    if(valid) {
+        x_control->addMeas(x, vx, time_ctrl_ms);
+        y_control->addMeas(y, vy, time_ctrl_ms);
+    }
+
+    double psi = 0;
+    double psi_dot = 0;
+    bool valid = false;
+    lateral_estimator->get_heading(psi, psi_dot, valid);
+    if(valid) {
+        psi_control->addMeas(psi, psi_dot, time_ctrl_ms);
+    }
+
     #ifdef IS_HOST
     // Print location estimate
     double x, vx, y, vy;
@@ -512,6 +542,9 @@ void Conductor::set_controller_activity(const bool is_active)
         controller_activity = is_active;
         alt_controller->resetState();
         lateral_estimator->reset();
+        psi_control->resetState();
+        x_control->resetState();
+        y_control->resetState();
 
         if(is_active) {
             // Make a better way of setting the target
@@ -604,16 +637,33 @@ void Conductor::timer_handler(const boost::system::error_code& error)
                 }
             }
 
-
             double chn_thr = -100;
             double chn_ele = 0;
             double chn_ail = 0;
             double chn_rud = 0;
             bool error = false;
-            std::string error_str  = "";
             long int current_pc_time_ms = time_elapsed_ms();
+
+            // Altitude controller
+            std::string error_str  = "";
             AltState_t prop_alt_state = alt_estimator->getPropagatedStateEstimate_safe(current_pc_time_ms, PROP_LIMIT, error, error_str);
             chn_thr = saturate(alt_controller->getControlTempState(prop_alt_state), MIN_CHANNEL_VALUE, MAX_THROTTLE);
+            
+            // Lateral control
+            if(psi_control->isValidState()) {
+                chn_rud = saturate(psi_control->getControl(), MIN_CHANNEl_LAT, MAX_CHANNEL_LAT);
+            }
+            if(x_control->isValidState()) {
+                chn_ail = saturate(x_control->getControl(), MIN_CHANNEl_LAT, MAX_CHANNEL_LAT);
+            }
+            if(y_control->isValidState()) {
+                chn_ele = saturate(y_control->getControl(), MIN_CHANNEl_LAT, MAX_CHANNEL_LAT);
+            }
+            // Disable controllers for initial testing
+            double chn_ele = 0;
+            double chn_ail = 0;
+            double chn_rud = 0;
+            
             // TODO: find a way to not set the arm channel
             // 0->ail, 1->ele, 2->thr, 3->rud, 4->arm
             std::array<double, 16> mixed_channels = {chn_ail, chn_ele, chn_thr, chn_rud, 100, -100, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
@@ -782,6 +832,9 @@ bool Conductor::open_files()
     status &= alt_estimator->open_files();
     status &= alt_controller->open_files();
     status &= lateral_estimator->open_files();
+    status &= psi_control->open_files();
+    status &= x_control->open_files();
+    status &= y_control->open_files();
 
     files_open = status;
 
@@ -796,6 +849,9 @@ void Conductor::close_files()
     alt_estimator->close_files();
     alt_controller->close_files();
     lateral_estimator->close_files();
+    psi_control->close_files();
+    x_control->close_files();
+    y_control->close_files();
     files_open = false;
 }
 
@@ -805,6 +861,9 @@ void Conductor::set_file_suffix(std::string suffix_in)
     alt_estimator->set_file_suffix(suffix);
     alt_controller->set_file_suffix(suffix);
     lateral_estimator->set_file_suffix(suffix);
+    psi_control->set_file_suffix(suffix);
+    x_control->set_file_suffix(suffix);
+    y_control->set_file_suffix(suffix);
 }
 
 std::string Conductor::get_file_suffix()
@@ -818,6 +877,9 @@ void Conductor::set_file_directory(std::string directory_in)
     alt_estimator->set_file_directory(directory_in);
     alt_controller->set_file_directory(directory_in);
     lateral_estimator->set_file_directory(directory_in);
+    psi_control->set_file_directory(directory_in);
+    x_control->set_file_directory(directory_in);
+    y_control->set_file_directory(directory_in);
 }
 
 std::string Conductor::get_file_directory()

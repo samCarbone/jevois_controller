@@ -26,6 +26,7 @@
 #include "altitudeestimator.h"
 #include "altitudecontroller.h"
 #include "lateralestimator.h"
+#include "pidcontroller.h"
 
 using json = nlohmann::json;
 using namespace boost::interprocess;
@@ -123,6 +124,11 @@ private:
     AltitudeController* alt_controller;
     AltitudeEstimator* alt_estimator;
     LateralEstimator* lateral_estimator;
+    PIDcontroller* psi_control; double P_psi = 31.8; double I_psi = 0; double D_psi = 10;
+    PIDcontroller* x_control; double P_x = 10; double I_x = 0; double D_x = 10;
+    PIDcontroller* y_control; double P_y = 10; double I_y = 0; double D_y = 10;
+    const double MIN_CHANNEl_LAT = -10;
+    const double MAX_CHANNEL_LAT = 10;
 
     // Start propagating lateral position only once a minimum altitude has been reached
     bool start_alt_reached = false;
