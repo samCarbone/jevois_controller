@@ -459,21 +459,21 @@ void Conductor::parse_attitude_msp(const std::vector<unsigned char> &attData)
 
     #ifdef IS_HOST
     // Print location estimate
-    double x, vx, y, vy;
-    x=0; vx=0; y=0; vy=0;
-    bool valid, warn_time;
-    valid=false; warn_time=true;
-    lateral_estimator->get_position(time_elapsed_ms(), x, vx, y, vy, valid, warn_time);
+    double x_t, vx_t, y_t, vy_t;
+    x_t=0; vx_t=0; y_t=0; vy_t=0;
+    bool valid_t, warn_time_t;
+    valid_t=false; warn_time_t=true;
+    lateral_estimator->get_position(time_elapsed_ms(), x_t, vx_t, y_t, vy_t, valid_t, warn_time_t);
     std::cout << "Time_ms: " << time_elapsed_ms() << std::fixed << std::setprecision(1)
                 << ", roll: " << roll/10.0
                 << ", pitch: " << pitch/10.0
                 << ", yaw: " << yaw << std::fixed << std::setprecision(3)
-                << ", x: " << x
-                << ", y: " << y
-                << ", vx: " << vx
-                << ",  vy: " << vy
-                << ", warn_time: " << warn_time
-                << ", valid: " << valid
+                << ", x: " << x_t
+                << ", y: " << y_t
+                << ", vx: " << vx_t
+                << ",  vy: " << vy_t
+                << ", warn_time: " << warn_time_t
+                << ", valid: " << valid_t
                 << std::endl;
     #endif
 
@@ -705,9 +705,9 @@ void Conductor::timer_handler(const boost::system::error_code& error)
             }
 
             // Disable lateral controllers for initial testing
-            double chn_ele = 0;
-            double chn_ail = 0;
-            double chn_rud = 0;
+            chn_ele = 0;
+            chn_ail = 0;
+            chn_rud = 0;
             
             // TODO: find a way to not set the arm channel
             // 0->ail, 1->ele, 2->thr, 3->rud, 4->arm
