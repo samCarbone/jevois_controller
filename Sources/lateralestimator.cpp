@@ -594,10 +594,12 @@ void LateralEstimator::DCM_Cbe(const double phi, const double theta, const doubl
 void LateralEstimator::get_position(long int time_ms, double &x, double &vx, double &y, double &vy, bool &valid, bool &warn_time, const long int prop_time_limit_ms)
 {
 
+    // Check validity
     if(!has_measurement) {
         valid = false; // If there has not been an imu measurement
         return;
     }
+    valid = true;
 
     // Apply the correction to give a position estimate
     double DeltaT_off = (time_ms - t_ms_off)/1000.0; // Time difference to when the offset was calculated in SECONDS
@@ -628,8 +630,6 @@ void LateralEstimator::get_position(long int time_ms, double &x, double &vx, dou
     y = y_raw_prop + y_off + vy_off*DeltaT_off;
     vy = vy_raw_prop + vy_off;
 
-    // Check validity
-    valid = true;
     if(DeltaT_off < 0 || DeltaT_raw < 0) {
         std::cerr << "[error] LateralEstimator, negative time delta. DeltaT_off: " << DeltaT_off << "s, DeltaT_raw: " << DeltaT_raw << "s" << std::endl;
         valid = false;
@@ -693,6 +693,8 @@ void LateralEstimator::get_heading(double &psi, double &psi_dot, bool &valid)
 
     // 3rd-order backwards difference
     psi_dot = (-2*psi_0+9*psi_1-18*psi_2+11*psi_3)/(6*h);
+
+    valid = true;
 
 }
 
