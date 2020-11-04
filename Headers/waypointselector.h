@@ -16,7 +16,7 @@ public:
     WaypointSelector();
     ~WaypointSelector();
     void updatePosition(const double x, const double y, const double z, long int time_ms); // Update the platform's position
-    int getWPID();
+    unsigned int getWPID();
     void getWPLoc(double &x_wp, double &y_wp, double &z_wp);
     void getWPVel(double &vx_wp, double &vy_wp, double &vz_wp);
     void getWPPsi(double &psi_wp);
@@ -33,8 +33,8 @@ public:
 private:
 
     // Attributes
-    int curr_seq_idx = 0; // Current sequence index
-    int curr_wp_id; // Current waypoint id
+    unsigned int curr_seq_idx = 0; // Current sequence index
+    unsigned int curr_wp_id; // Current waypoint id
 
     // Waypoint locations
     const std::vector<double> wp_x_e = {0}; // m

@@ -52,7 +52,7 @@ void WaypointSelector::updatePosition(const double x, const double y, const doub
 
 }
 
-int WaypointSelector::getWPID()
+unsigned int WaypointSelector::getWPID()
 {
     return wp_seq.at(curr_seq_idx);
 }
