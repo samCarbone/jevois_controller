@@ -30,6 +30,10 @@ public:
     void get_heading(double &psi, double &psi_dot, bool &valid);
 
     void reset();
+    
+    static void calc_vec_z_rotation(const Eigen::Vector3d &a, /* Observed gate orientation vector in Earth frame */
+                                        const Eigen::Vector3d &b, /* True gate orientation vector in Earth frame */
+                                        double &psi /* True gate yaw - observed gate yaw */);
 
     void prior_ransac(const Eigen::VectorXd &Dt,
                     const Eigen::VectorXd &Dx,
@@ -137,9 +141,6 @@ private:
 
     void calc_offsets(double &_x_off, double &_vx_off, double &_y_off, double &_vy_off, double &_psi_off, double &_psi_dot_off, long int &_t_ms_off, bool &valid);
 
-    static void calc_vec_z_rotation(const Eigen::Vector3d &a, /* Observed gate orientation vector in Earth frame */
-                                        const Eigen::Vector3d &b, /* True gate orientation vector in Earth frame */
-                                        double &psi /* True gate yaw - observed gate yaw */);
 
     // a mutex to control writes
 

@@ -421,10 +421,10 @@ void Conductor::parse_attitude_msp(const std::vector<unsigned char> &attData)
     lateral_estimator->get_position(time_ctrl_ms, x, vx, y, vy, lat_valid, warn_time);
 
     // Get current yaw
-    double psi = 0;
-    double psi_dot = 0;
+    double psi_meas = 0;
+    double psi_dot_meas = 0;
     bool psi_valid = false;
-    lateral_estimator->get_heading(psi, psi_dot, psi_valid);
+    lateral_estimator->get_heading(psi_meas, psi_dot_meas, psi_valid);
 
     if(lat_valid && psi_valid && alt_state.valid) {
         // Update waypoints
@@ -440,12 +440,18 @@ void Conductor::parse_attitude_msp(const std::vector<unsigned char> &attData)
         
         x_control->setTarget(target_x, target_vx);
         y_control->setTarget(target_y, target_vy);
-        psi_control->setTarget(target_psi, 0.0);
 
         // Update lat controllers with new measurements
         x_control->addMeas(x, vx, time_ctrl_ms);
         y_control->addMeas(y, vy, time_ctrl_ms);
-        psi_control->addMeas(psi, psi_dot, time_ctrl_ms);
+
+        // Generate yaw error via smallest rotation to the target
+        Eigen::Vector3d psi_meas_vec(std::cos(psi_meas), std::sin(psi_meas), 0);
+        Eigen::Vector3d psi_target_vec(std::cos(target_psi), std::sin(target_psi), 0);
+        double psi_diff = 0;
+        LateralEstimator::calc_vec_z_rotation(psi_target_vec, psi_meas_vec, psi_diff);
+        psi_control->setTarget(0.0, 0.0);
+        psi_control->addMeas(psi_diff, psi_dot_meas, time_ctrl_ms);
 
         // Update altitude controller target
         // but only if it isn't trying to land
