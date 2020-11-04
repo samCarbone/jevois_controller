@@ -560,6 +560,7 @@ void Conductor::set_controller_activity(const bool is_active)
     if(is_active != controller_activity) {
 
         landing = false;
+        start_alt_reached = false;
         controller_activity = is_active;
         alt_controller->resetState();
         lateral_estimator->reset();
