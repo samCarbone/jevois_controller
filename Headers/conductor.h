@@ -125,11 +125,11 @@ private:
     AltitudeController* alt_controller;
     AltitudeEstimator* alt_estimator;
     LateralEstimator* lateral_estimator;
-    PIDcontroller* psi_control; double P_psi = 9; double I_psi = 0; double D_psi = 4.5;
-    PIDcontroller* x_control; double P_x = 5; double I_x = 0; double D_x = 2.5;
-    PIDcontroller* y_control; double P_y = 5; double I_y = 0; double D_y = 2.5;
-    const double MIN_CHANNEl_LAT = -10;
-    const double MAX_CHANNEL_LAT = 10;
+    PIDcontroller* psi_control; double P_psi = 20; double I_psi = 0; double D_psi = 0;
+    PIDcontroller* x_control; double P_x = 20; double I_x = 0; double D_x = 25;
+    PIDcontroller* y_control; double P_y = 20; double I_y = 0; double D_y = 25;
+    const double MIN_CHANNEl_LAT = -30;
+    const double MAX_CHANNEL_LAT = 30;
     WaypointSelector* waypoints;
 
     // Start propagating lateral position only once a minimum altitude has been reached

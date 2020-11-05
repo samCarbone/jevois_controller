@@ -37,26 +37,26 @@ private:
     unsigned int curr_wp_id; // Current waypoint id
 
     // Waypoint locations
-    const std::vector<double> wp_x_e = {0}; // m
-    const std::vector<double> wp_y_e = {0}; // m
-    const std::vector<double> wp_z_e = {-0.5}; // m
+    const std::vector<double> wp_x_e = {0,3,4,4,4,2,1,1,1}; // m
+    const std::vector<double> wp_y_e = {0,0,0,0,-1,-1,-1,-1,0}; // m
+    const std::vector<double> wp_z_e = {-0.5,-0.5,-0.5,-0.5,-0.5,-0.5,-0.5,-0.5,-0.5}; // m
 
     // Wapoint velocity targets
-    const std::vector<double> wp_vx_e = {0}; // m/s
-    const std::vector<double> wp_vy_e = {0}; // m/s
-    const std::vector<double> wp_vz_e = {0}; // m/s
+    const std::vector<double> wp_vx_e = {0,0.2,0,0,0,-0.2,0,0,0}; // m/s
+    const std::vector<double> wp_vy_e = {0,0,0,0,0,0,0,0,0}; // m/s
+    const std::vector<double> wp_vz_e = {0,0,0,0,0,0,0,0,0}; // m/s
 
     // Wapoint orientation targets
-    const std::vector<double> wp_psi = {0}; // rad
-
-    // Waypoint sequence
-    const std::vector<int> wp_seq = {0}; // allows arbitrary sequences of the waypoints
+    const std::vector<double> wp_psi = {0,0,0,-2.356,-3.142,-3.142,-3.142,0.7854,0}; // rad
 
     // Waypoint loiter times
-    const std::vector<long int> wp_loiter = {100000}; // ms
+    const std::vector<long int> wp_loiter = {15000,500,3000,3000,5000,500,3000,3000,5000}; // ms
+
+    // Waypoint sequence
+    const std::vector<int> wp_seq = {0,1,2,3,4,5,6,7,8,0}; // allows arbitrary sequences of the waypoints
 
     // Trigger distance
-    const double trigger_dist = 1; // m
+    const double trigger_dist = 0.5; // m
     bool curr_triggered = false; // If the current waypoint has been triggered
     long int triggerTime_ms = 0; // ms, time that the current waypoint was triggered
 

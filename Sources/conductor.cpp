@@ -712,8 +712,8 @@ void Conductor::timer_handler(const boost::system::error_code& error)
             }
 
             // Disable lateral controllers for initial testing
-            chn_ele = 0;
-            chn_ail = 0;
+            // chn_ele = 0;
+            // chn_ail = 0;
             // chn_rud = 0;
             
             // TODO: find a way to not set the arm channel

@@ -30,7 +30,7 @@ public:
     void get_heading(double &psi, double &psi_dot, bool &valid);
 
     void reset();
-    
+
     static void calc_vec_z_rotation(const Eigen::Vector3d &a, /* Observed gate orientation vector in Earth frame */
                                         const Eigen::Vector3d &b, /* True gate orientation vector in Earth frame */
                                         double &psi /* True gate yaw - observed gate yaw */);
@@ -58,8 +58,8 @@ public:
 private:
 
     // Drag
-    const double Cdx = 0.3;
-    const double Cdy = 0.3;
+    const double Cdx = 0.25;
+    const double Cdy = 0.61;
 
     // Roll and pitch offsets
     const double pitch_off = 0; // Degrees
@@ -91,7 +91,7 @@ private:
     double psi_off_inst = 0; // Instantaneous psi offset
 
     /*one-gate*/
-    // const std::vector<double> gates_x_e = {1}; // m
+    // const std::vector<double> gates_x_e = {2.5}; // m
     // const std::vector<double> gates_y_e = {0}; // m
     // const std::vector<double> gates_z_e = {-0.5}; // m
 
@@ -109,16 +109,31 @@ private:
     // const std::vector<double> gates_orient_z = {0,0};
 
     /*two-gates -- lateral drag calc*/
+    // const std::vector<double> gates_x_e = {2.5,2.5}; // m
+    // const std::vector<double> gates_y_e = {0,-2.5}; // m
+    // const std::vector<double> gates_z_e = {-0.5,-0.5}; // m
+
+    // const std::vector<double> gates_orient_x = {1,1};
+    // const std::vector<double> gates_orient_y = {0,0};
+    // const std::vector<double> gates_orient_z = {0,0};
+
+    /*two-gates -- rotate left*/
+    // const std::vector<double> gates_x_e = {2.5,0}; // m
+    // const std::vector<double> gates_y_e = {0,-2.5}; // m
+    // const std::vector<double> gates_z_e = {-0.5,-0.5}; // m
+
+    // const std::vector<double> gates_orient_x = {1,0};
+    // const std::vector<double> gates_orient_y = {0,-1};
+    // const std::vector<double> gates_orient_z = {0,0};
+
+    /*two-gates -- first pass-through test*/
     const std::vector<double> gates_x_e = {2.5,2.5}; // m
-    const std::vector<double> gates_y_e = {0,-2.5}; // m
+    const std::vector<double> gates_y_e = {0,-1}; // m
     const std::vector<double> gates_z_e = {-0.5,-0.5}; // m
 
-    const std::vector<double> gates_orient_x = {1,1};
+    const std::vector<double> gates_orient_x = {1,-1};
     const std::vector<double> gates_orient_y = {0,0};
     const std::vector<double> gates_orient_z = {0,0};
-
-
-
 
     const double POS_ERROR_MAX_LIMIT = 2; // m
     const double PSI_ERROR_MAX_LIMIT = M_PI/4; // rad
@@ -132,7 +147,7 @@ private:
     std::deque<double> queue_y_raw;
     std::deque<double> queue_psi_error;
 
-    static constexpr long int SLIDING_WINDOW_MS = 5000;
+    static constexpr long int SLIDING_WINDOW_MS = 2000; // 5000
     static constexpr int MIN_SAMPLES_IN_WINDOW = 10; // Minimum number of samples in the window to perform regression
 
     static constexpr long int LIMIT_CAM_TIME_DIFF_MS = 50; // ms, limit between mis-match of camera and IMU times
