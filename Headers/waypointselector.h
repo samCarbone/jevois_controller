@@ -50,10 +50,10 @@ private:
     const std::vector<double> wp_psi = {0,0,0,-2.356,-3.142,-3.142,-3.142,0.7854,0}; // rad
 
     // Waypoint loiter times
-    const std::vector<long int> wp_loiter = {15000,500,3000,3000,5000,500,3000,3000,5000}; // ms
+    const std::vector<long int> wp_loiter = {15000,500,1000,1500,4000,500,1000,1500,4000}; // ms
 
     // Waypoint sequence
-    const std::vector<int> wp_seq = {0,1,2,3,4,5,6,7,8,0}; // allows arbitrary sequences of the waypoints
+    const std::vector<int> wp_seq = {0,1,2,3,4,5,6,7,8,1,2,3,4,5,6,7,8,0}; // allows arbitrary sequences of the waypoints
 
     // Trigger distance
     const double trigger_dist = 0.5; // m
